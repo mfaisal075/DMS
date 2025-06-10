@@ -1,5 +1,6 @@
 import {
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,12 +13,13 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DatePicker from 'react-native-date-picker';
 
-const Donations = () => {
+const Donations = ({navigation}: any) => {
   const [selectedTab, setSelectedTab] = useState('All Donations');
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [date, setDate] = useState(new Date());
   const [dateOpen, setDateOpen] = useState(false);
+  const [modalVisible, setModalVisible] = useState('');
 
   const [items, setItems] = useState([
     {label: 'Donation type 1', value: 1},
@@ -145,13 +147,19 @@ const Donations = () => {
                   <Text style={styles.itemRole}>Rs. {donor.amount}</Text>
                 </View>
                 <View style={styles.itemActions}>
-                  <TouchableOpacity style={styles.actionButton}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => setModalVisible('View')}>
                     <Icon name="eye" size={20} color="#4ECDC4" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionButton}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('UpdateDonation')}>
                     <Icon name="pencil" size={20} color="#6E11B0" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionButton}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => setModalVisible('Delete')}>
                     <Icon name="delete" size={20} color="#FF6B6B" />
                   </TouchableOpacity>
                 </View>
@@ -395,6 +403,254 @@ const Donations = () => {
           </>
         )}
       </View>
+
+      {/* View Modal */}
+      <Modal
+        transparent
+        visible={modalVisible === 'View'}
+        animationType="fade"
+        onRequestClose={() => {
+          setModalVisible('');
+        }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+              alignItems: 'center',
+              position: 'relative',
+            }}>
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setModalVisible('');
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+
+            {/* Modal Body */}
+            <View style={styles.modalTop}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                <Image
+                  source={require('../assets/logo-black.png')}
+                  resizeMode="contain"
+                  style={styles.modalLogo}
+                />
+                <Text style={{fontSize: 12, fontWeight: '900', marginLeft: 12}}>
+                  Receipt NO:{' '}
+                  <Text
+                    style={{
+                      fontWeight: '300',
+                      textDecorationLine: 'underline',
+                    }}>
+                    DON-0030
+                  </Text>
+                </Text>
+              </View>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Name:</Text>
+              <Text style={styles.modalSimpText}>Muhammad Awais</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Contact:</Text>
+              <Text style={styles.modalSimpText}>03001122335</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Address:</Text>
+              <Text style={styles.modalSimpText}>Hafizabad Road</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Donation Type: </Text>
+              <Text style={styles.modalSimpText}>Donation type 1</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>District: </Text>
+              <Text style={styles.modalSimpText}>N/A</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Zone/ Tehsil: </Text>
+              <Text style={styles.modalSimpText}>N/A</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Union Council: </Text>
+              <Text style={styles.modalSimpText}>New UC</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Remarks: </Text>
+              <Text style={styles.modalSimpText}>None</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Payment Mode: </Text>
+              <Text style={styles.modalSimpText}>..........</Text>
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>
+                Amount: <Text style={styles.modalSimpText}>Rs. 5000/-</Text>
+              </Text>
+              <Text style={styles.modalBoldText}>
+                Date: <Text style={styles.modalSimpText}>6/5/2025</Text>
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.modalRow,
+                {flexDirection: 'column', alignItems: 'flex-start'},
+              ]}>
+              <Text style={styles.modalBoldText}>Amount In Words: </Text>
+              <Text style={styles.modalSimpText}>
+                Five Thousand Rupees Only
+              </Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.modalRow}>
+              <Text style={styles.modalBoldText}>Received By:</Text>
+              <Text style={styles.modalSimpText}>Admin</Text>
+            </View>
+            <View style={styles.stampContainer}>
+              <Text style={[styles.modalSimpText, {fontSize: 12}]}>
+                Office Stamp
+              </Text>
+            </View>
+
+            <View style={styles.separator} />
+            <Text
+              style={[
+                styles.modalSimpText,
+                {fontSize: 12, fontWeight: '900', color: '#888'},
+              ]}>
+              Thank you for your generous contribution.
+            </Text>
+            <View style={styles.separator} />
+
+            <TouchableOpacity style={styles.modalPrintBtn}>
+              <Icon name="printer" size={18} color={'#fff'} />
+              <Text style={styles.modalPrintBtnText}>Print</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Modal */}
+      <Modal
+        transparent
+        visible={modalVisible === 'Delete'}
+        animationType="fade"
+        onRequestClose={() => setModalVisible('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 24,
+              alignItems: 'center',
+              elevation: 10,
+            }}>
+            {/* Warning Icon */}
+            <View
+              style={{
+                backgroundColor: '#FFF3CD',
+                borderRadius: 50,
+                padding: 16,
+                marginBottom: 12,
+              }}>
+              <Icon name="alert-circle" size={40} color="#FFA500" />
+            </View>
+            {/* Title */}
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: 'bold',
+                color: '#6E11B0',
+                marginBottom: 8,
+                textAlign: 'center',
+              }}>
+              Are you sure?
+            </Text>
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontSize: 15,
+                color: '#555',
+                marginBottom: 28,
+                textAlign: 'center',
+              }}>
+              This {selectedTab === 'Roles' && 'Role'}
+              {selectedTab === 'System Users' && 'User'}
+              {selectedTab === 'Donors' && 'Donor'} be permanently deleted.
+            </Text>
+            {/* Buttons */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  // handle delete logic here
+                  setModalVisible('');
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Yes, delete it
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => setModalVisible('')}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -570,5 +826,63 @@ const styles = StyleSheet.create({
     borderColor: '#888',
     borderWidth: 0.6,
     borderRadius: 8,
+  },
+
+  //Modal
+  modalTop: {
+    width: '100%',
+    paddingHorizontal: '3%',
+    paddingVertical: 10,
+  },
+  modalLogo: {
+    height: 100,
+    width: 100,
+  },
+  modalRow: {
+    width: '100%',
+    paddingHorizontal: '5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  modalBoldText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modalSimpText: {
+    fontWeight: '400',
+  },
+  separator: {
+    marginTop: 10,
+    marginBottom: 10,
+    height: 1,
+    backgroundColor: '#666',
+    width: '100%',
+  },
+  stampContainer: {
+    height: 80,
+    width: 120,
+    marginTop: 10,
+    borderColor: '#000',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalPrintBtn: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'green',
+    borderRadius: 10,
+  },
+  modalPrintBtnText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '900',
+    marginLeft: 5,
   },
 });

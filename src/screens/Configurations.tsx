@@ -246,7 +246,7 @@ const Configurations = () => {
       <Modal
         transparent
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setModalVisible(false)}>
         <View
           style={{
@@ -439,7 +439,7 @@ const Configurations = () => {
       <Modal
         transparent
         visible={editModalVisible}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setEditModalVisible(false)}>
         <View
           style={{

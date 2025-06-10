@@ -6,6 +6,8 @@ import Dashboard from '../screens/Dashboard';
 import Users from '../screens/Users';
 import Donations from '../screens/Donations';
 import Configurations from '../screens/Configurations';
+import UpdateDonation from '../screens/UpdateDonation';
+import Reports from '../screens/Reports';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,6 +38,16 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Configurations"
           component={Configurations}
+          options={{headerShown: false}}
+        />
+        <Stack.Screen
+          name="UpdateDonation"
+          component={UpdateDonation}
+          options={{headerShown: false}}
+        />
+        <Stack.Screen
+          name="Reports"
+          component={Reports}
           options={{headerShown: false}}
         />
       </Stack.Navigator>

@@ -84,6 +84,7 @@ const Dashboard = ({navigation}: any) => {
               button.id === 'Donations' && navigation.navigate('Donations');
               button.id === 'Configurations' &&
                 navigation.navigate('Configurations');
+              button.id === 'Reports' && navigation.navigate('Reports');
             }}>
             <Icon name={button.icon} size={32} color="#FFF" />
             <Text style={styles.actionButtonText}>{button.id}</Text>
