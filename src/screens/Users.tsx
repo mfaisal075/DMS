@@ -8,39 +8,341 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import axios from 'axios';
+import BASE_URL from '../components/BASE_URL';
+import Toast from 'react-native-toast-message';
+import {Animated, Easing, Platform} from 'react-native';
+import DropDownPicker from 'react-native-dropdown-picker';
+
+interface Roles {
+  _id: string;
+  role: string;
+}
+
+interface SystemUsers {
+  _id: string;
+  name: string;
+  email: string;
+  roleId: {
+    _id: string;
+    role: string;
+  };
+  img: string;
+  cnic: string;
+  contact: string;
+}
+
+interface AddUser {
+  name: string;
+  email: string;
+  contact: string;
+  cnic: string;
+  password: string;
+  confirmPassword: string;
+  img: string;
+}
+
+const initialAddUserForm: AddUser = {
+  name: '',
+  email: '',
+  contact: '',
+  cnic: '',
+  password: '',
+  confirmPassword: '',
+  img: '',
+};
 
 const Users = () => {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(null);
   const [selectedTab, setSelectedTab] = useState('Roles');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [role, setRole] = useState('');
+  const [updateRole, setUpdateRole] = useState('');
+  const [selectedRole, setSelectedRole] = useState<string | ''>('');
+  const [selectedUser, setSelectedUser] = useState<SystemUsers[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState('');
+  const [addUserForm, setAddUserForm] = useState<AddUser>(initialAddUserForm);
+
+  const [rolesData, setRolesData] = useState<Roles[]>([]);
+  const [usersData, setUsersData] = useState<SystemUsers[]>([]);
+
+  const userOnChange = async (field: keyof AddUser, value: string) => {
+    setAddUserForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const [roles, setRoles] = useState<Roles[]>([]);
+  const transformedRoles = roles.map(role => ({
+    label: role.role,
+    value: role._id,
+  }));
+
+  // Get Roles
+  const getAllRoles = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/Role/getAllRoles`);
+      setRolesData(res.data);
+      setRoles(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Add Role
+  const addRole = async () => {
+    if (!role) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a role name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    // Check if role already exists (case-insensitive)
+    const exists = rolesData.some(
+      r => r.role.trim().toLowerCase() === role.trim().toLowerCase(),
+    );
+    if (exists) {
+      Toast.show({
+        type: 'error',
+        text1: 'Duplicate Role',
+        text2: 'A role with this name already exists.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const res = await axios.post(`${BASE_URL}/Role/addRole`, {
+        role: role.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Role added successfully!',
+          visibilityTime: 1500,
+        });
+        setRole('');
+        setModalVisible(false);
+        getAllRoles();
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // Delete Role
+  const deleteRole = async () => {
+    try {
+      const res = await axios.delete(
+        `${BASE_URL}/Role/delRole/${selectedRole}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Role deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getAllRoles();
+        setSelectedRole('');
+        setDeleteModalVisible(false);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // Update Role
+  const editRole = async () => {
+    if (!updateRole) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a role name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    // Check if role already exists (case-insensitive)
+    const exists = rolesData.some(
+      r => r.role.trim().toLowerCase() === updateRole.trim().toLowerCase(),
+    );
+    if (exists) {
+      Toast.show({
+        type: 'error',
+        text1: 'Duplicate Role',
+        text2: 'A role with this name already exists.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/Role/updatRole/${selectedRole}`,
+        {
+          role: updateRole.trim(),
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Role updated successfully!',
+          visibilityTime: 1500,
+        });
+      }
+
+      getAllRoles();
+      setUpdateRole(''), setSelectedRole('');
+      setEditModalVisible(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Get Users
+  const getUsers = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/SystemUser/getUser`);
+      setUsersData(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Delete User
+  const deleteUser = async () => {
+    try {
+      const res = await axios.delete(
+        `${BASE_URL}/SystemUser/delUser/${selectedUser[0]?._id}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Role deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getUsers();
+        setSelectedUser([]);
+        setDeleteModalVisible(false);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // Add System User
+  const addUser = async () => {
+    // Validation checks
+    if (
+      !addUserForm.name.trim() ||
+      !addUserForm.email.trim() ||
+      !addUserForm.contact.trim() ||
+      !addUserForm.cnic.trim() ||
+      !addUserForm.password.trim() ||
+      !addUserForm.confirmPassword.trim() ||
+      !value
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill all fields and select a role.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    // Email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(addUserForm.email.trim())) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    // Password match check
+    if (addUserForm.password.trim() !== addUserForm.confirmPassword.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Password Mismatch',
+        text2: 'Passwords do not match.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axios.post(`${BASE_URL}/SystemUser/addUser`, {
+        name: addUserForm.name.trim(),
+        email: addUserForm.email.trim(),
+        contact: addUserForm.contact.trim(),
+        cnic: addUserForm.cnic.trim(),
+        password: addUserForm.password.trim(),
+        confirmPassword: addUserForm.confirmPassword.trim(),
+        roleId: value,
+        img: addUserForm.img,
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'User added successfully!',
+          visibilityTime: 1500,
+        });
+        setAddUserForm(initialAddUserForm);
+        setAddModalVisible('');
+        getUsers();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.data?.message || 'Failed to add user.',
+          visibilityTime: 1500,
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to add user.',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Mock data for each category
-  const rolesData = [
-    {id: '1', name: 'Administrator', description: 'Full system access'},
-    {id: '2', name: 'Manager', description: 'Manage donations & users'},
-    {id: '3', name: 'Viewer', description: 'Read-only access'},
-  ];
-
-  const usersData = [
-    {
-      id: '1',
-      name: 'Ahmed Khan',
-      email: 'ahmed@example.com',
-      role: 'Administrator',
-    },
-    {id: '2', name: 'Fatima Ali', email: 'fatima@example.com', role: 'Manager'},
-    {
-      id: '3',
-      name: 'Zainab Hassan',
-      email: 'zainab@example.com',
-      role: 'Viewer',
-    },
-    {id: '4', name: 'Bilal Ahmed', email: 'bilal@example.com', role: 'Manager'},
-  ];
 
   const donorsData = [
     {
@@ -75,6 +377,41 @@ const Users = () => {
     {id: 'System Users', icon: 'account-cog', color: '#4ECDC4'},
     {id: 'Donors', icon: 'account-heart', color: '#FFD166'},
   ];
+
+  useEffect(() => {
+    getAllRoles();
+    getUsers();
+  }, []);
+
+  const LoadingSpinner = () => {
+    const spinValue = new Animated.Value(0);
+
+    useEffect(() => {
+      Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingSquare}>
+          <Animated.View
+            style={[styles.dashedCircle, {transform: [{rotate: spin}]}]}
+          />
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -123,7 +460,9 @@ const Users = () => {
       </View>
 
       {/* Content Area */}
-      <ScrollView style={styles.contentContainer}>
+      <ScrollView
+        style={styles.contentContainer}
+        contentContainerStyle={{paddingBottom: 40}}>
         {/* Roles List */}
         {selectedTab === 'Roles' && (
           <>
@@ -136,26 +475,38 @@ const Users = () => {
                 <Text style={styles.btnText}>Add New Role</Text>
               </TouchableOpacity>
             </View>
-            {rolesData.map(role => (
-              <View key={role.id} style={styles.listItem}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{role.name}</Text>
-                  <Text style={styles.itemSubtitle}>{role.description}</Text>
+            {loading ? (
+              <LoadingSpinner />
+            ) : rolesData.length === 0 ? (
+              <Text style={styles.noDataText}>No roles found</Text>
+            ) : (
+              rolesData.map(role => (
+                <View key={role._id} style={styles.listItem}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{role.role}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setSelectedRole(role._id);
+                        setUpdateRole(role.role);
+                        setEditModalVisible(true);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setSelectedRole(role._id);
+                        setDeleteModalVisible(true);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </>
         )}
 
@@ -166,40 +517,57 @@ const Users = () => {
             <View style={styles.addBtnContainer}>
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
+                onPress={() => setAddModalVisible('User')}>
                 <Icon name="plus" size={18} color={'#fff'} />
                 <Text style={styles.btnText}>Add New User</Text>
               </TouchableOpacity>
             </View>
-            {usersData.map(user => (
-              <View key={user.id} style={styles.listItem}>
-                <View style={styles.avatar}>
-                  <Icon name="account-circle" size={40} color="#6E11B0" />
+            {loading ? (
+              <LoadingSpinner />
+            ) : rolesData.length === 0 ? (
+              <Text style={styles.noDataText}>No Users found</Text>
+            ) : (
+              usersData.map(user => (
+                <View key={user._id} style={styles.listItem}>
+                  <View style={styles.avatar}>
+                    <Icon name="account-circle" size={40} color="#6E11B0" />
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{user.name}</Text>
+                    <Text style={styles.itemSubtitle}>{user.email}</Text>
+
+                    <Text style={styles.itemRole}>
+                      {user.roleId && user.roleId.role
+                        ? user.roleId.role
+                        : 'User'}
+                    </Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setSelectedUser([user]);
+                        setViewModalVisible(true);
+                      }}>
+                      <Icon name="eye" size={20} color="#4ECDC4" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => setEditModalVisible(true)}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelectedUser([user]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{user.name}</Text>
-                  <Text style={styles.itemSubtitle}>{user.email}</Text>
-                  <Text style={styles.itemRole}>{user.role}</Text>
-                </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setViewModalVisible(true)}>
-                    <Icon name="eye" size={20} color="#4ECDC4" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </>
         )}
 
@@ -247,7 +615,7 @@ const Users = () => {
         )}
       </ScrollView>
 
-      {/* Add Modal */}
+      {/* Add Role Modal */}
       <Modal
         transparent
         visible={modalVisible}
@@ -260,6 +628,7 @@ const Users = () => {
             justifyContent: 'center',
             alignItems: 'center',
           }}>
+          <Toast />
           <View
             style={{
               width: '85%',
@@ -297,12 +666,12 @@ const Users = () => {
                 placeholder={
                   selectedTab === 'Roles'
                     ? 'Enter Role Name'
-                    : selectedTab === 'System Users'
-                    ? 'Enter User Name'
                     : selectedTab === 'Donors'
                     ? 'Enter Donor Name'
                     : ''
                 }
+                value={selectedTab === 'Roles' ? role : ''}
+                onChangeText={selectedTab === 'Roles' ? setRole : () => {}}
                 placeholderTextColor={'#888'}
                 style={{
                   borderWidth: 1,
@@ -322,13 +691,211 @@ const Users = () => {
                 paddingVertical: 12,
                 alignItems: 'center',
               }}
-              onPress={() => {}}>
+              onPress={() => {
+                selectedTab === 'Roles' && addRole();
+              }}>
               <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                 Add {selectedTab === 'Roles' && 'Role'}
                 {selectedTab === 'System Users' && 'User'}
                 {selectedTab === 'Donors' && 'Doner'}
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add System Users */}
+      <Modal
+        transparent
+        visible={addModalVisible === 'User'}
+        animationType="fade"
+        onRequestClose={() => setAddModalVisible('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setAddModalVisible('');
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              {selectedTab === 'System Users' && 'Add New User'}
+              {selectedTab === 'Donors' && 'Add New Donor'}
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter Name'}
+                value={addUserForm.name}
+                onChangeText={t => userOnChange('name', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Enter Email'}
+                value={addUserForm.email}
+                onChangeText={t => userOnChange('email', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Enter Contact'}
+                value={addUserForm.contact}
+                onChangeText={t => userOnChange('contact', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Enter CNIC'}
+                value={addUserForm.cnic}
+                onChangeText={t => userOnChange('cnic', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.textInput,
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 15,
+                    backgroundColor: '#F8F9FC',
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // TODO: Implement file picker logic here
+                }}>
+                <Text
+                  style={{
+                    color: addUserForm.img ? '#222' : '#888',
+                    fontSize: 16,
+                  }}>
+                  {addUserForm.img ? 'File Selected' : 'Choose File'}
+                </Text>
+                <Icon name="file-upload" size={22} color="#6E11B0" />
+              </TouchableOpacity>
+              <TextInput
+                placeholder={'Enter Password'}
+                value={addUserForm.password}
+                onChangeText={t => userOnChange('password', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Confirm Password'}
+                value={addUserForm.confirmPassword}
+                onChangeText={t => userOnChange('confirmPassword', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <View style={[styles.dropDownContainer, {width: '100%'}]}>
+                <DropDownPicker
+                  open={open}
+                  value={value}
+                  items={transformedRoles}
+                  setOpen={setOpen}
+                  setValue={setValue}
+                  placeholder="Select Role"
+                  placeholderStyle={{
+                    color: '#888',
+                    fontSize: 16,
+                  }}
+                  ArrowUpIconComponent={() => (
+                    <Icon name="chevron-up" size={25} color="#6E11B0" />
+                  )}
+                  ArrowDownIconComponent={() => (
+                    <Icon name="chevron-down" size={25} color="#6E11B0" />
+                  )}
+                  style={styles.dropDown}
+                  textStyle={{
+                    fontSize: 14,
+                    color: '#222',
+                  }}
+                  labelProps={{
+                    numberOfLines: 1,
+                    ellipsizeMode: 'tail',
+                  }}
+                  dropDownContainerStyle={{
+                    borderRadius: 12,
+                    maxHeight: 200,
+                    zIndex: 1000,
+                  }}
+                  listItemContainerStyle={{
+                    height: 45,
+                  }}
+                  listItemLabelStyle={{
+                    fontSize: 16,
+                    color: '#222',
+                    overflow: 'hidden',
+                  }}
+                />
+              </View>
+            </View>
+            {/* Buttons Row */}
+            <View
+              style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  addUser();
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Add User
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => setAddModalVisible('')}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -405,8 +972,8 @@ const Users = () => {
                   marginRight: 8,
                 }}
                 onPress={() => {
-                  // handle delete logic here
-                  setDeleteModalVisible(false);
+                  selectedTab === 'Roles' && deleteRole();
+                  selectedTab === 'System Users' && deleteUser();
                 }}>
                 <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                   Yes, delete it
@@ -491,6 +1058,10 @@ const Users = () => {
                     : ''
                 }
                 placeholderTextColor={'#888'}
+                value={selectedTab === 'Roles' ? updateRole : ''}
+                onChangeText={
+                  selectedTab === 'Roles' ? setUpdateRole : () => {}
+                }
                 style={{
                   borderWidth: 1,
                   borderColor: '#E0E0E0',
@@ -509,7 +1080,9 @@ const Users = () => {
                 paddingVertical: 12,
                 alignItems: 'center',
               }}
-              onPress={() => {}}>
+              onPress={() => {
+                selectedTab === 'Roles' && editRole();
+              }}>
               <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                 Save Changes
               </Text>
@@ -554,6 +1127,7 @@ const Users = () => {
               }}
               onPress={() => {
                 setViewModalVisible(false);
+                setSelectedUser([]);
               }}>
               <Icon name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -577,13 +1151,7 @@ const Users = () => {
                   color: '#6E11B0',
                   textAlign: 'center',
                 }}>
-                {selectedTab === 'Donors'
-                  ? 'Donor Details'
-                  : selectedTab === 'System Users'
-                  ? 'User Details'
-                  : selectedTab === 'Roles'
-                  ? 'Role Details'
-                  : 'Details'}
+                User Details
               </Text>
             </View>
             {/* Profile Picture */}
@@ -601,13 +1169,15 @@ const Users = () => {
               }}>
               <Image
                 source={{
-                  uri: 'https://randomuser.me/api/portraits/men/75.jpg',
+                  uri: selectedUser[0]?.img
+                    ? selectedUser[0]?.img
+                    : 'https://randomuser.me/api/portraits/men/1.jpg',
                 }}
                 style={{width: 80, height: 80}}
                 resizeMode="cover"
               />
             </View>
-            {/* Dummy Data */}
+
             <View style={{width: '100%'}}>
               <Text
                 style={{
@@ -617,33 +1187,28 @@ const Users = () => {
                   marginBottom: 10,
                   textAlign: 'center',
                 }}>
-                Name: <Text style={{color: '#333'}}>M Adan Hunjra</Text>
+                Name:{' '}
+                <Text style={{color: '#333'}}>{selectedUser[0]?.name}</Text>
               </Text>
               <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
                 <Text style={{fontWeight: 'bold', color: '#666'}}>
                   Contact:
                 </Text>{' '}
-                576890876
+                {selectedUser[0]?.contact}
               </Text>
               <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>
-                  Address:
-                </Text>{' '}
-                Kalasky
+                <Text style={{fontWeight: 'bold', color: '#666'}}>Email:</Text>{' '}
+                {selectedUser[0]?.email}
               </Text>
               <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>
-                  District:
-                </Text>{' '}
-                Gujranwala District
+                <Text style={{fontWeight: 'bold', color: '#666'}}>CNIC:</Text>{' '}
+                {selectedUser[0]?.cnic}
               </Text>
               <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>Zone:</Text>{' '}
-                Gujranwala Zone
-              </Text>
-              <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>UC:</Text> UC
-                4
+                <Text style={{fontWeight: 'bold', color: '#666'}}>Role:</Text>{' '}
+                {selectedUser[0]?.roleId?.role
+                  ? selectedUser[0]?.roleId?.role
+                  : 'User'}
               </Text>
             </View>
           </View>
@@ -789,5 +1354,64 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginLeft: 5,
+  },
+
+  //Loading Component
+  loadingContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingSquare: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+  },
+  dashedCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 7,
+    borderColor: '#6E11B0',
+    ...Platform.select({
+      ios: {
+        borderStyle: 'dashed',
+      },
+      android: {
+        borderStyle: 'dotted',
+      },
+    }),
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#8E8E93',
+    fontSize: 16,
+    marginTop: 20,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#F8F9FC',
+    marginBottom: 15,
+  },
+  dropDownContainer: {
+    width: '100%',
+  },
+  dropDown: {
+    backgroundColor: 'rgba(245, 245, 245, 0.2)',
+    borderColor: '#888',
+    borderWidth: 0.6,
+    borderRadius: 8,
   },
 });

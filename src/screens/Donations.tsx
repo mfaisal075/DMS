@@ -20,6 +20,17 @@ const Donations = ({navigation}: any) => {
   const [date, setDate] = useState(new Date());
   const [dateOpen, setDateOpen] = useState(false);
   const [modalVisible, setModalVisible] = useState('');
+  const [ucOpen, setUCOpen] = useState(false);
+  const [ucValue, setUCValue] = useState(null);
+  const [fromDate, setFromDate] = useState(new Date());
+  const [toDate, setToDate] = useState(new Date());
+  const [fromDateOpen, setFromDateOpen] = useState(false);
+  const [toDateOpen, setToDateOpen] = useState(false);
+  const [distValue, setDistValue] = useState(null);
+  const [distOpen, setDistOpen] = useState(false);
+  const [zoneValue, setZoneValue] = useState(null);
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const [items, setItems] = useState([
     {label: 'Donation type 1', value: 1},
@@ -79,6 +90,36 @@ const Donations = ({navigation}: any) => {
     },
   ];
 
+  const [districtItems, setDistrictItems] = useState([
+    {label: 'Wazirabad District', value: 1},
+    {label: 'Lahore District', value: 2},
+    {label: 'Gujranwala District', value: 3},
+    {label: 'Sheikhupura District', value: 4},
+    {label: 'Rawalpindi District', value: 5},
+    {label: 'Mardan District', value: 6},
+    {label: 'Karachi District', value: 7},
+  ]);
+
+  const [zoneItems, setZoneItems] = useState([
+    {label: 'Wazirabad Zone', value: 1},
+    {label: 'Lahore Zone', value: 2},
+    {label: 'Gujranwala Zone', value: 3},
+    {label: 'Sheikhupura Zone', value: 4},
+    {label: 'Rawalpindi Zone', value: 5},
+    {label: 'Mardan Zone', value: 6},
+    {label: 'Karachi Zone', value: 7},
+  ]);
+
+  const [ucItems, setUCItems] = useState([
+    {label: 'Union council 20', value: 1},
+    {label: 'Union council 3', value: 2},
+    {label: 'UC 1 Ali Pur Chattha', value: 3},
+    {label: 'UC Kalaske', value: 4},
+    {label: 'Union council 70', value: 5},
+    {label: 'Union council 18', value: 6},
+    {label: 'New UC', value: 7},
+  ]);
+
   // Tab buttons
   const tabs = [
     {id: 'All Donations', icon: 'charity', color: '#4ECDC4'},
@@ -135,6 +176,284 @@ const Donations = ({navigation}: any) => {
       {selectedTab === 'All Donations' && (
         <ScrollView style={styles.contentContainer}>
           <>
+            <View
+              style={{
+                backgroundColor: 'transparent',
+                width: '100%',
+                marginBottom: 10,
+              }}>
+              <TouchableOpacity
+                style={styles.filterHeader}
+                onPress={() => setFiltersExpanded(!filtersExpanded)}>
+                <Text style={styles.filterHeaderText}>Filters</Text>
+                <Icon
+                  name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={24}
+                  color="#6E11B0"
+                />
+              </TouchableOpacity>
+              {filtersExpanded && (
+                <>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[styles.textInput, {width: '100%'}]}
+                      placeholder="Donor Name"
+                      placeholderTextColor={'#666'}
+                    />
+                  </View>
+                  <View style={styles.row}>
+                    <TouchableOpacity
+                      style={[
+                        styles.textInput,
+                        {
+                          width: '48%',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: 'rgba(245, 245, 245, 0.2)',
+                          marginTop: 8,
+                        },
+                      ]}
+                      onPress={() => setFromDateOpen(true)}
+                      activeOpacity={0.8}>
+                      <Text style={{color: '#222', fontSize: 16}}>
+                        {fromDate ? fromDate.toLocaleDateString() : 'From Date'}
+                      </Text>
+                      <Icon name="calendar" size={22} color="#6E11B0" />
+                      <DatePicker
+                        modal
+                        open={fromDateOpen}
+                        mode="date"
+                        date={fromDate}
+                        onConfirm={date => {
+                          setFromDateOpen(false);
+                          setFromDate(date);
+                        }}
+                        onCancel={() => {
+                          setFromDateOpen(false);
+                        }}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.textInput,
+                        {
+                          width: '48%',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: 'rgba(245, 245, 245, 0.2)',
+                          marginTop: 8,
+                        },
+                      ]}
+                      onPress={() => setFromDateOpen(true)}
+                      activeOpacity={0.8}>
+                      <Text style={{color: '#222', fontSize: 16}}>
+                        {toDate ? toDate.toLocaleDateString() : 'To Date'}
+                      </Text>
+                      <Icon name="calendar" size={22} color="#6E11B0" />
+                      <DatePicker
+                        modal
+                        open={toDateOpen}
+                        mode="date"
+                        date={toDate}
+                        onConfirm={date => {
+                          setToDateOpen(false);
+                          setToDate(date);
+                        }}
+                        onCancel={() => {
+                          setToDateOpen(false);
+                        }}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.row}>
+                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                      <DropDownPicker
+                        open={open}
+                        value={value}
+                        items={items}
+                        setOpen={setOpen}
+                        setValue={setValue}
+                        setItems={setItems}
+                        placeholder="Select Type"
+                        placeholderStyle={{
+                          color: '#888',
+                          fontSize: 16,
+                        }}
+                        ArrowUpIconComponent={() => (
+                          <Icon name="chevron-up" size={25} color="#6E11B0" />
+                        )}
+                        ArrowDownIconComponent={() => (
+                          <Icon name="chevron-down" size={25} color="#6E11B0" />
+                        )}
+                        style={styles.dropDown}
+                        textStyle={{
+                          fontSize: 14,
+                          color: '#222',
+                        }}
+                        labelProps={{
+                          numberOfLines: 1,
+                          ellipsizeMode: 'tail',
+                        }}
+                        dropDownContainerStyle={{
+                          borderRadius: 12,
+                          maxHeight: 200,
+                          zIndex: 1000,
+                        }}
+                        listItemContainerStyle={{
+                          height: 45,
+                        }}
+                        listItemLabelStyle={{
+                          fontSize: 16,
+                          color: '#222',
+                          overflow: 'hidden',
+                        }}
+                      />
+                    </View>
+                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                      <DropDownPicker
+                        open={distOpen}
+                        value={distValue}
+                        items={districtItems}
+                        setOpen={setDistOpen}
+                        setValue={setDistValue}
+                        setItems={setDistrictItems}
+                        placeholder="Select District"
+                        placeholderStyle={{
+                          color: '#888',
+                          fontSize: 16,
+                        }}
+                        ArrowUpIconComponent={() => (
+                          <Icon name="chevron-up" size={25} color="#6E11B0" />
+                        )}
+                        ArrowDownIconComponent={() => (
+                          <Icon name="chevron-down" size={25} color="#6E11B0" />
+                        )}
+                        style={styles.dropDown}
+                        textStyle={{
+                          fontSize: 14,
+                          color: '#222',
+                        }}
+                        labelProps={{
+                          numberOfLines: 1,
+                          ellipsizeMode: 'tail',
+                        }}
+                        dropDownContainerStyle={{
+                          borderRadius: 12,
+                          maxHeight: 200,
+                          zIndex: 1001,
+                        }}
+                        listItemContainerStyle={{
+                          height: 45,
+                        }}
+                        listItemLabelStyle={{
+                          fontSize: 16,
+                          color: '#222',
+                          overflow: 'hidden',
+                        }}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.row}>
+                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                      <DropDownPicker
+                        open={zoneOpen}
+                        value={zoneValue}
+                        items={zoneItems}
+                        setOpen={setZoneOpen}
+                        setValue={setZoneValue}
+                        setItems={setZoneItems}
+                        placeholder="Select Zone"
+                        placeholderStyle={{
+                          color: '#888',
+                          fontSize: 16,
+                        }}
+                        ArrowUpIconComponent={() => (
+                          <Icon name="chevron-up" size={25} color="#6E11B0" />
+                        )}
+                        ArrowDownIconComponent={() => (
+                          <Icon name="chevron-down" size={25} color="#6E11B0" />
+                        )}
+                        style={[
+                          styles.dropDown,
+                          {
+                            zIndex: 999,
+                          },
+                        ]}
+                        textStyle={{
+                          fontSize: 14,
+                          color: '#222',
+                        }}
+                        labelProps={{
+                          numberOfLines: 1,
+                          ellipsizeMode: 'tail',
+                        }}
+                        dropDownContainerStyle={{
+                          borderRadius: 12,
+                          maxHeight: 200,
+                        }}
+                        listItemContainerStyle={{
+                          height: 45,
+                        }}
+                        listItemLabelStyle={{
+                          fontSize: 16,
+                          color: '#222',
+                          overflow: 'hidden',
+                        }}
+                      />
+                    </View>
+                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                      <DropDownPicker
+                        open={ucOpen}
+                        value={ucValue}
+                        items={ucItems}
+                        setOpen={setUCOpen}
+                        setValue={setUCValue}
+                        setItems={setUCItems}
+                        placeholder="Select UC"
+                        placeholderStyle={{
+                          color: '#888',
+                          fontSize: 16,
+                        }}
+                        ArrowUpIconComponent={() => (
+                          <Icon name="chevron-up" size={25} color="#6E11B0" />
+                        )}
+                        ArrowDownIconComponent={() => (
+                          <Icon name="chevron-down" size={25} color="#6E11B0" />
+                        )}
+                        style={[
+                          styles.dropDown,
+                          {
+                            zIndex: 999,
+                          },
+                        ]}
+                        textStyle={{
+                          fontSize: 14,
+                          color: '#222',
+                        }}
+                        labelProps={{
+                          numberOfLines: 1,
+                          ellipsizeMode: 'tail',
+                        }}
+                        dropDownContainerStyle={{
+                          borderRadius: 12,
+                          maxHeight: 200,
+                        }}
+                        listItemContainerStyle={{
+                          height: 45,
+                        }}
+                        listItemLabelStyle={{
+                          fontSize: 16,
+                          color: '#222',
+                          overflow: 'hidden',
+                        }}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
             <Text style={styles.sectionTitle}>All Users</Text>
             {donationsData.map(donor => (
               <View key={donor.id} style={styles.listItem}>
@@ -884,5 +1203,29 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     marginLeft: 5,
+  },
+  row: {
+    marginTop: 15,
+    flexDirection: 'row',
+    width: '100%',
+    paddingHorizontal: '5%',
+    justifyContent: 'space-between',
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F9FC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 10,
+  },
+  filterHeaderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6E11B0',
   },
 });

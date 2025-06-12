@@ -10,6 +10,7 @@ import React, {useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DatePicker from 'react-native-date-picker';
+import {ScrollView} from 'react-native';
 
 const Reports = () => {
   const [open, setOpen] = useState(false);
@@ -24,6 +25,51 @@ const Reports = () => {
   const [toDate, setToDate] = useState(new Date());
   const [fromDateOpen, setFromDateOpen] = useState(false);
   const [toDateOpen, setToDateOpen] = useState(false);
+
+  const dummyReports = [
+    {
+      id: 1,
+      donorName: 'Ali Raza',
+      date: '2024-06-01',
+      donationType: 'Education fund',
+      amount: 'PKR 10,000',
+    },
+    {
+      id: 2,
+      donorName: 'Sara Khan',
+      date: '2024-06-02',
+      donationType: 'Health Fund',
+      amount: 'PKR 5,000',
+    },
+    {
+      id: 3,
+      donorName: 'Ahmed Malik',
+      date: '2024-06-03',
+      donationType: 'Donation type 1',
+      amount: 'PKR 2,500',
+    },
+    {
+      id: 4,
+      donorName: 'Ali Raza',
+      date: '2024-06-01',
+      donationType: 'Education fund',
+      amount: 'PKR 10,000',
+    },
+    {
+      id: 5,
+      donorName: 'Sara Khan',
+      date: '2024-06-02',
+      donationType: 'Health Fund',
+      amount: 'PKR 5,000',
+    },
+    {
+      id: 6,
+      donorName: 'Ahmed Malik',
+      date: '2024-06-03',
+      donationType: 'Donation type 1',
+      amount: 'PKR 2,500',
+    },
+  ];
 
   const [items, setItems] = useState([
     {label: 'Donation type 1', value: 1},
@@ -101,7 +147,7 @@ const Reports = () => {
               style={[
                 styles.textInput,
                 {
-                  width: '46%',
+                  width: '48%',
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -133,7 +179,7 @@ const Reports = () => {
               style={[
                 styles.textInput,
                 {
-                  width: '46%',
+                  width: '48%',
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -194,6 +240,7 @@ const Reports = () => {
                 dropDownContainerStyle={{
                   borderRadius: 12,
                   maxHeight: 200,
+                  zIndex: 1000,
                 }}
                 listItemContainerStyle={{
                   height: 45,
@@ -236,6 +283,7 @@ const Reports = () => {
                 dropDownContainerStyle={{
                   borderRadius: 12,
                   maxHeight: 200,
+                  zIndex: 1001,
                 }}
                 listItemContainerStyle={{
                   height: 45,
@@ -268,7 +316,12 @@ const Reports = () => {
                 ArrowDownIconComponent={() => (
                   <Icon name="chevron-down" size={25} color="#6E11B0" />
                 )}
-                style={styles.dropDown}
+                style={[
+                  styles.dropDown,
+                  {
+                    zIndex: 999,
+                  },
+                ]}
                 textStyle={{
                   fontSize: 14,
                   color: '#222',
@@ -310,7 +363,12 @@ const Reports = () => {
                 ArrowDownIconComponent={() => (
                   <Icon name="chevron-down" size={25} color="#6E11B0" />
                 )}
-                style={styles.dropDown}
+                style={[
+                  styles.dropDown,
+                  {
+                    zIndex: 999,
+                  },
+                ]}
                 textStyle={{
                   fontSize: 14,
                   color: '#222',
@@ -345,6 +403,85 @@ const Reports = () => {
 
           {/* Separator */}
           <View style={styles.separator} />
+
+          <View style={styles.headingContainer}>
+            <Text style={[styles.heading, {color: '#6E11B0'}]}>Report</Text>
+            <TouchableOpacity style={styles.button}>
+              <Text style={styles.btnText}>Download PDF</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={{maxHeight: 350}}
+            contentContainerStyle={{paddingBottom: 50}}>
+            {dummyReports.map(report => (
+              <TouchableOpacity
+                key={report.id}
+                style={{
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 14,
+                  marginHorizontal: 15,
+                  marginBottom: 12,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  shadowColor: '#6E11B0',
+                  shadowOffset: {width: 0, height: 2},
+                  shadowOpacity: 0.08,
+                  shadowRadius: 6,
+                  elevation: 2,
+                  minHeight: 60,
+                  justifyContent: 'center',
+                }}
+                onPress={() => {
+                  // Handle card click (e.g., show details)
+                }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                  <View style={{flex: 1, marginRight: 10}}>
+                    <Text
+                      style={{
+                        fontSize: 17,
+                        fontWeight: '700',
+                        color: '#6E11B0',
+                        marginBottom: 2,
+                      }}>
+                      {report.donorName}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: '#444',
+                        fontWeight: '400',
+                        marginBottom: 1,
+                      }}>
+                      {report.date}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: '#888',
+                        fontWeight: '400',
+                      }}>
+                      {report.donationType}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: '#6E11B0',
+                      fontWeight: '700',
+                      marginLeft: 8,
+                    }}>
+                    {report.amount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </View>
     </View>
@@ -380,7 +517,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dropDownContainer: {
-    width: '46%',
+    width: '48%',
   },
   dropDown: {
     backgroundColor: 'rgba(245, 245, 245, 0.2)',
@@ -429,5 +566,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     color: '#fff',
+  },
+  headingContainer: {
+    width: '100%',
+    height: 35,
+    marginVertical: 5,
+    paddingHorizontal: '5%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

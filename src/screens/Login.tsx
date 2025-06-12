@@ -9,13 +9,83 @@ import {
 import React, {useState} from 'react';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import axios from 'axios';
+import BASE_URL from '../components/BASE_URL';
+import Toast from 'react-native-toast-message';
+
+interface LoginForm {
+  email: string;
+  password: string;
+}
+
+const initialLoginForm: LoginForm = {
+  email: '',
+  password: '',
+};
 
 const Login = ({navigation}: any) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [loginForm, setLoginForm] = useState<LoginForm>(initialLoginForm);
+
+  // Login Form Onchnage
+  const loginOnChange = (field: keyof LoginForm, value: string) => {
+    setLoginForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   // Toggle password visibility
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  // Handle Login Function
+  const handleLogin = async () => {
+    if (!loginForm.email.trim() || !loginForm.password.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please enter both email and password.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${BASE_URL}/SystemUser/signIn`, {
+        email: loginForm.email,
+        password: loginForm.password,
+      });
+
+      if (response.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Login Successful',
+          text2: 'Welcome back!',
+          visibilityTime: 1500,
+        });
+        navigation.replace('Dashboard');
+      }
+    } catch (error: any) {
+      if (error.response && error.response.status === 400) {
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: error.response.data?.message || 'Invalid email or password.',
+          visibilityTime: 1500,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2:
+            error.response?.data?.message || 'An unexpected error occurred.',
+          visibilityTime: 1500,
+        });
+      }
+      console.log(error);
+    }
   };
   return (
     <SafeAreaProvider>
@@ -31,13 +101,13 @@ const Login = ({navigation}: any) => {
             <View style={{alignItems: 'center', marginBottom: 24}}>
               <ImageBackground
                 source={require('../assets/logo-black.png')}
-                style={{width: 150, height: 120}}
+                style={{width: 140, height: 110}}
                 resizeMode="contain"
               />
               <View>
                 <Text
                   style={{
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: 'bold',
                     color: '#222',
                     textAlign: 'center',
@@ -46,7 +116,7 @@ const Login = ({navigation}: any) => {
                 </Text>
                 <Text
                   style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     color: '#666',
                     textAlign: 'center',
                   }}>
@@ -61,6 +131,8 @@ const Login = ({navigation}: any) => {
                 style={styles.textInput}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                value={loginForm.email}
+                onChangeText={t => loginOnChange('email', t)}
               />
               <View style={{position: 'relative'}}>
                 <TextInput
@@ -69,6 +141,8 @@ const Login = ({navigation}: any) => {
                   style={styles.textInput}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  value={loginForm.password}
+                  onChangeText={t => loginOnChange('password', t)}
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
@@ -84,7 +158,7 @@ const Login = ({navigation}: any) => {
             <TouchableOpacity
               style={styles.loginBtnContainer}
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('Dashboard')}>
+              onPress={() => handleLogin()}>
               <Text style={styles.loginBtnText}>Log In</Text>
             </TouchableOpacity>
           </View>
