@@ -21,6 +21,21 @@ interface Roles {
   role: string;
 }
 
+interface Districts {
+  _id: string;
+  district: string;
+}
+
+interface UC {
+  _id: string;
+  uname: string;
+}
+
+interface Zones {
+  _id: string;
+  zname: string;
+}
+
 interface SystemUsers {
   _id: string;
   name: string;
@@ -54,9 +69,62 @@ const initialAddUserForm: AddUser = {
   img: '',
 };
 
+interface UpdateUser {
+  name: string;
+  email: string;
+  contact: string;
+  cnic: string;
+  img: string;
+}
+
+const initialUpdateUserForm: UpdateUser = {
+  name: '',
+  email: '',
+  contact: '',
+  cnic: '',
+  img: '',
+};
+
+interface Donors {
+  _id: string;
+  name: string;
+  contact: string;
+  address: string;
+  districtId: {
+    _id: string;
+    district: string;
+  };
+  zoneId: {
+    _id: string;
+    zname: string;
+  };
+  ucId: {
+    _id: string;
+    uname: string;
+  };
+}
+
+interface AddDonor {
+  name: string;
+  contact: string;
+  address: string;
+}
+
+const initialAddDonorForm: AddDonor = {
+  address: '',
+  contact: '',
+  name: '',
+};
+
 const Users = () => {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(null);
+  const [value, setValue] = useState<string | null>(null);
+  const [distValue, setDistValue] = useState<string | null>(null);
+  const [distOpen, setDistOpen] = useState(false);
+  const [ucOpen, setUCOpen] = useState(false);
+  const [ucValue, setUCValue] = useState<string | null>(null);
+  const [zoneValue, setZoneValue] = useState<string | null>(null);
+  const [zoneOpen, setZoneOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState('Roles');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -69,9 +137,36 @@ const Users = () => {
   const [loading, setLoading] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState('');
   const [addUserForm, setAddUserForm] = useState<AddUser>(initialAddUserForm);
-
+  const [updateForm, setUpdateForm] = useState<UpdateUser>(
+    initialUpdateUserForm,
+  );
+  const [selectedUserID, setSelectedUserID] = useState('');
+  const [selectedDonor, setSelectedDonor] = useState<Donors[]>([]);
+  const [addDonorForm, setAddDonorForm] =
+    useState<AddDonor>(initialAddDonorForm);
   const [rolesData, setRolesData] = useState<Roles[]>([]);
   const [usersData, setUsersData] = useState<SystemUsers[]>([]);
+  const [donors, setDonors] = useState<Donors[]>([]);
+  const [dist, setDist] = useState('');
+  const [zone, setZone] = useState('');
+  const [uc, setUc] = useState('');
+  const [donorAddModal, setDonorAddModal] = useState('');
+  const [updateDonorForm, setDonorUpdateForm] =
+    useState<AddDonor>(initialAddDonorForm);
+
+  // State for search and filter in System Users tab
+  const [searchName, setSearchName] = useState('');
+  const [roleFilterOpen, setRoleFilterOpen] = useState(false);
+  const [roleFilterValue, setRoleFilterValue] = useState<string | null>(null);
+
+  //State for search and filter in Donor tab
+  const [searchDonor, setSearchDonor] = useState('');
+  const [distFilterOpen, setDistFilterOpen] = useState(false);
+  const [distFilterValue, setDistFilterValue] = useState<string | null>(null);
+  const [ucFilterOpen, setUcFilterOpen] = useState(false);
+  const [ucFilterValue, setUcFilterValue] = useState<string | null>(null);
+  const [zoneFilterOpen, setZoneFilterOpen] = useState(false);
+  const [zoneFilterValue, setZoneFilterValue] = useState<string | null>(null);
 
   const userOnChange = async (field: keyof AddUser, value: string) => {
     setAddUserForm(prev => ({
@@ -80,10 +175,53 @@ const Users = () => {
     }));
   };
 
+  const updateOnChange = async (field: keyof UpdateUser, value: string) => {
+    setUpdateForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const donorOnChange = async (field: keyof AddDonor, value: string) => {
+    setAddDonorForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const donorUpdateOnChange = async (field: keyof AddDonor, value: string) => {
+    setDonorUpdateForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Roles DropDown Picker
   const [roles, setRoles] = useState<Roles[]>([]);
   const transformedRoles = roles.map(role => ({
     label: role.role,
     value: role._id,
+  }));
+
+  // District Dropdown
+  const [districts, setDistricts] = useState<Districts[]>([]);
+  const transformedDist = districts.map(dist => ({
+    label: dist.district,
+    value: dist._id,
+  }));
+
+  // UC Dropdown
+  const [ucItems, setUCItems] = useState<UC[]>([]);
+  const transformedUC = ucItems.map(uc => ({
+    label: uc.uname,
+    value: uc._id,
+  }));
+
+  // Zone Dropdown
+  const [zoneItems, setZoneItems] = useState<Zones[]>([]);
+  const transformedZone = zoneItems.map(zone => ({
+    label: zone.zname,
+    value: zone._id,
   }));
 
   // Get Roles
@@ -97,6 +235,32 @@ const Users = () => {
       console.log(error);
     } finally {
       setLoading(false);
+    }
+  };
+  //Get Districts
+  const getAllDist = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/District/getAllDist`);
+      setDistricts(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // Get UC
+  const getAllUC = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/UC/getAllUC`);
+      setUCItems(res.data);
+    } catch (error) {}
+  };
+  // Get Zones
+  const getAllZone = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/Zone/getAllZone`);
+
+      setZoneItems(res.data);
+    } catch (error) {
+      console.log(error);
     }
   };
   // Add Role
@@ -341,35 +505,388 @@ const Users = () => {
       setLoading(false);
     }
   };
+  // Update User
+  const updateUser = async () => {
+    // Validation checks
+    if (
+      !updateForm.name.trim() ||
+      !updateForm.email.trim() ||
+      !updateForm.contact.trim() ||
+      !updateForm.cnic.trim() ||
+      !value
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill all fields and select a role.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
 
-  // Mock data for each category
+    // Email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(updateForm.email.trim())) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
 
-  const donorsData = [
-    {
-      id: '1',
-      name: 'Rashid Latif',
-      contact: '0321-1234567',
-      donations: 'PKR 15,000',
-    },
-    {
-      id: '2',
-      name: 'Asghar Ali',
-      contact: '0315-7654321',
-      donations: 'PKR 25,000',
-    },
-    {
-      id: '3',
-      name: 'Junaid Ilyas',
-      contact: '0300-1122334',
-      donations: 'PKR 10,000',
-    },
-    {
-      id: '4',
-      name: 'Babar Rehman',
-      contact: '0333-9988776',
-      donations: 'PKR 30,000',
-    },
-  ];
+    try {
+      setLoading(true);
+      const res = await axios.put(
+        `${BASE_URL}/SystemUser/EditUserById/${selectedUserID}`,
+        {
+          name: updateForm.name.trim(),
+          email: updateForm.email.trim(),
+          contact: updateForm.contact,
+          cnic: updateForm.cnic,
+          roleId: value,
+          img: updateForm.img,
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'User updated successfully!',
+          visibilityTime: 1500,
+        });
+        setUpdateForm(initialUpdateUserForm);
+        setAddModalVisible('');
+        getUsers();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.data?.message || 'Failed to add user.',
+          visibilityTime: 1500,
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to add user.',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get Donors
+  const getDonors = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/Donor/getDonors`);
+      setDonors(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Delete Donor
+  const deleteDonor = async () => {
+    try {
+      const res = await axios.delete(
+        `${BASE_URL}/Donor/delDonor/${selectedDonor[0]?._id}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donor deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getDonors();
+        setSelectedDonor([]);
+        setDeleteModalVisible(false);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  // Add Donor
+  const addDonor = async () => {
+    if (
+      !addDonorForm.name.trim() ||
+      !addDonorForm.contact.trim() ||
+      !addDonorForm.address.trim() ||
+      !distValue ||
+      !zoneValue ||
+      !ucValue
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill all fields and select District, Zone, and UC.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axios.post(`${BASE_URL}/Donor/addDonor`, {
+        name: addDonorForm.name.trim(),
+        contact: addDonorForm.contact.trim(),
+        address: addDonorForm.address.trim(),
+        districtId: distValue,
+        zoneId: zoneValue,
+        ucId: ucValue,
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donor added successfully!',
+          visibilityTime: 1500,
+        });
+        setAddDonorForm(initialAddDonorForm);
+        setDistValue(null);
+        setZoneValue(null);
+        setUCValue(null);
+        setAddModalVisible('');
+        getDonors();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.data?.message || 'Failed to add donor.',
+          visibilityTime: 1500,
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to add donor.',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Add District
+  const addDist = async () => {
+    if (!dist.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a district name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = districts.some(
+        d => d.district.trim().toLowerCase() === dist.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A district with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/District/addDist`, {
+        district: dist.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'District added successfully!',
+          visibilityTime: 1500,
+        });
+        setDist('');
+        setDonorAddModal('');
+        getAllDist();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Add UC
+  const addUC = async () => {
+    if (!uc.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a UC name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = ucItems.some(
+        d => d.uname.trim().toLowerCase() === uc.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate UC',
+          text2: 'A UC with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/UC/addUC`, {
+        uname: uc.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'UC added successfully!',
+          visibilityTime: 1500,
+        });
+        setUc('');
+        setDonorAddModal('');
+        getAllUC();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Add Zone
+  const addZone = async () => {
+    if (!zone.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Zone name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = zoneItems.some(
+        d => d.zname.trim().toLowerCase() === zone.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate Zone',
+          text2: 'A Zone with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/Zone/addZone`, {
+        zname: zone.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Zone added successfully!',
+          visibilityTime: 1500,
+        });
+        setZone('');
+        setDonorAddModal('');
+        getAllZone();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  //Update Donor
+  const updateDonor = async () => {
+    if (
+      !updateDonorForm.name.trim() ||
+      !updateDonorForm.contact.trim() ||
+      !updateDonorForm.address.trim() ||
+      !distValue ||
+      !zoneValue ||
+      !ucValue
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill all fields and select District, Zone, and UC.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axios.put(
+        `${BASE_URL}/Donor/updateDonor/${selectedDonor[0]._id}`,
+        {
+          address: updateDonorForm.address.trim(),
+          contact: updateDonorForm.contact,
+          districtId: distValue,
+          name: updateDonorForm.name.trim(),
+          ucId: ucValue,
+          zoneId: zoneValue,
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donor added successfully!',
+          visibilityTime: 1500,
+        });
+        setDonorUpdateForm(initialAddDonorForm);
+        setDistValue(null);
+        setZoneValue(null);
+        setUCValue(null);
+        setAddModalVisible('');
+        getDonors();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.data?.message || 'Failed to add donor.',
+          visibilityTime: 1500,
+        });
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   // Tab buttons
   const tabs = [
@@ -381,6 +898,10 @@ const Users = () => {
   useEffect(() => {
     getAllRoles();
     getUsers();
+    getDonors();
+    getAllDist();
+    getAllUC();
+    getAllZone();
   }, []);
 
   const LoadingSpinner = () => {
@@ -412,6 +933,32 @@ const Users = () => {
       </View>
     );
   };
+
+  const filteredUsers = usersData.filter(user => {
+    const matchesName = user.name
+      .toLowerCase()
+      .includes(searchName.toLowerCase());
+
+    const matchesRole =
+      !roleFilterValue || user.roleId?._id === roleFilterValue;
+
+    return matchesName && matchesRole;
+  });
+
+  const filteredDonors = donors.filter(donor => {
+    const matchesName = donor.name
+      .toLowerCase()
+      .includes(searchDonor.toLowerCase());
+
+    const matchesDist =
+      !distFilterValue || donor.districtId?._id === distFilterValue;
+
+    const matchesZone =
+      !zoneFilterValue || donor.zoneId?._id === distFilterValue;
+    const matchesUC = !ucFilterValue || donor.ucId?._id === ucFilterValue;
+
+    return matchesName && matchesDist && matchesZone && matchesUC;
+  });
 
   return (
     <View style={styles.container}>
@@ -459,28 +1006,27 @@ const Users = () => {
         ))}
       </View>
 
-      {/* Content Area */}
-      <ScrollView
-        style={styles.contentContainer}
-        contentContainerStyle={{paddingBottom: 40}}>
-        {/* Roles List */}
-        {selectedTab === 'Roles' && (
-          <>
+      {/* Roles List */}
+      {selectedTab === 'Roles' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>User Roles</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New Role</Text>
-              </TouchableOpacity>
-            </View>
-            {loading ? (
-              <LoadingSpinner />
-            ) : rolesData.length === 0 ? (
-              <Text style={styles.noDataText}>No roles found</Text>
-            ) : (
-              rolesData.map(role => (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setModalVisible(true)}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New Role</Text>
+            </TouchableOpacity>
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : rolesData.length === 0 ? (
+            <Text style={styles.noDataText}>No roles found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {rolesData.map(role => (
                 <View key={role._id} style={styles.listItem}>
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle}>{role.role}</Text>
@@ -505,29 +1051,97 @@ const Users = () => {
                     </TouchableOpacity>
                   </View>
                 </View>
-              ))
-            )}
-          </>
-        )}
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-        {/* System Users List */}
-        {selectedTab === 'System Users' && (
-          <>
+      {/* System Users List */}
+      {selectedTab === 'System Users' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>All Users</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setAddModalVisible('User')}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New User</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setAddModalVisible('User')}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New User</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Filters */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 10,
+              paddingHorizontal: '6%',
+            }}>
+            {/* Search by Name */}
+            <View style={{flex: 1, marginRight: 8}}>
+              <TextInput
+                placeholder="Search by Name"
+                placeholderTextColor="#888"
+                style={[styles.textInput, {marginBottom: 0}]}
+                value={searchName}
+                onChangeText={setSearchName}
+              />
             </View>
-            {loading ? (
-              <LoadingSpinner />
-            ) : rolesData.length === 0 ? (
-              <Text style={styles.noDataText}>No Users found</Text>
-            ) : (
-              usersData.map(user => (
+            {/* Search by Role */}
+            <View style={{flex: 1}}>
+              <DropDownPicker
+                open={roleFilterOpen}
+                value={roleFilterValue}
+                items={transformedRoles}
+                setOpen={setRoleFilterOpen}
+                setValue={setRoleFilterValue}
+                placeholder="Filter by Role"
+                placeholderStyle={{
+                  color: '#888',
+                  fontSize: 16,
+                }}
+                ArrowUpIconComponent={() => (
+                  <Icon name="chevron-up" size={25} color="#6E11B0" />
+                )}
+                ArrowDownIconComponent={() => (
+                  <Icon name="chevron-down" size={25} color="#6E11B0" />
+                )}
+                style={styles.dropDown}
+                textStyle={{
+                  fontSize: 14,
+                  color: '#222',
+                }}
+                labelProps={{
+                  numberOfLines: 1,
+                  ellipsizeMode: 'tail',
+                }}
+                dropDownContainerStyle={{
+                  borderRadius: 12,
+                  maxHeight: 200,
+                  zIndex: 1002,
+                }}
+                listItemContainerStyle={{
+                  height: 45,
+                }}
+                listItemLabelStyle={{
+                  fontSize: 16,
+                  color: '#222',
+                  overflow: 'hidden',
+                }}
+                containerStyle={{zIndex: 1002}}
+                onChangeValue={val => setRoleFilterValue(val)}
+              />
+            </View>
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredUsers.length === 0 ? (
+            <Text style={styles.noDataText}>No Users found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredUsers.map(user => (
                 <View key={user._id} style={styles.listItem}>
                   <View style={styles.avatar}>
                     <Icon name="account-circle" size={40} color="#6E11B0" />
@@ -535,7 +1149,6 @@ const Users = () => {
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle}>{user.name}</Text>
                     <Text style={styles.itemSubtitle}>{user.email}</Text>
-
                     <Text style={styles.itemRole}>
                       {user.roleId && user.roleId.role
                         ? user.roleId.role
@@ -553,7 +1166,18 @@ const Users = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.actionButton}
-                      onPress={() => setEditModalVisible(true)}>
+                      onPress={() => {
+                        setAddModalVisible('updateUser');
+                        setUpdateForm({
+                          name: user.name,
+                          email: user.email,
+                          contact: user.contact,
+                          cnic: user.cnic,
+                          img: user.img,
+                        });
+                        setValue(user.roleId?._id);
+                        setSelectedUserID(user._id);
+                      }}>
                       <Icon name="pencil" size={20} color="#6E11B0" />
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -566,54 +1190,246 @@ const Users = () => {
                     </TouchableOpacity>
                   </View>
                 </View>
-              ))
-            )}
-          </>
-        )}
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-        {/* Donors List */}
-        {selectedTab === 'Donors' && (
-          <>
+      {/* Donors List */}
+      {selectedTab === 'Donors' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>Donors</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New Donor</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setAddModalVisible('Donor')}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New Donor</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Filters for Donors */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 10,
+              paddingHorizontal: '6%',
+              marginBottom: 10,
+              zIndex: 1003, // Highest zIndex for District filter
+            }}>
+            {/* Search by Donor Name */}
+            <View style={{flex: 1, marginRight: 8}}>
+              <TextInput
+                placeholder="Search by Donor Name"
+                placeholderTextColor="#888"
+                style={[styles.textInput, {marginBottom: 0}]}
+                value={searchDonor}
+                onChangeText={setSearchDonor}
+              />
             </View>
-            {donorsData.map(donor => (
-              <View key={donor.id} style={styles.listItem}>
-                <View style={styles.avatar}>
-                  <Icon name="office-building" size={35} color="#6E11B0" />
+            {/* Search by District */}
+            <View style={{flex: 1, zIndex: 1003}}>
+              <DropDownPicker
+                open={distFilterOpen}
+                value={distFilterValue}
+                items={transformedDist}
+                setOpen={setDistFilterOpen}
+                setValue={setDistFilterValue}
+                placeholder="Filter by District"
+                placeholderStyle={{
+                  color: '#888',
+                  fontSize: 16,
+                }}
+                ArrowUpIconComponent={() => (
+                  <Icon name="chevron-up" size={25} color="#6E11B0" />
+                )}
+                ArrowDownIconComponent={() => (
+                  <Icon name="chevron-down" size={25} color="#6E11B0" />
+                )}
+                style={styles.dropDown}
+                textStyle={{
+                  fontSize: 14,
+                  color: '#222',
+                }}
+                labelProps={{
+                  numberOfLines: 1,
+                  ellipsizeMode: 'tail',
+                }}
+                dropDownContainerStyle={{
+                  borderRadius: 12,
+                  maxHeight: 200,
+                  zIndex: 1003,
+                }}
+                listItemContainerStyle={{
+                  height: 45,
+                }}
+                listItemLabelStyle={{
+                  fontSize: 16,
+                  color: '#222',
+                  overflow: 'hidden',
+                }}
+                containerStyle={{zIndex: 1003}}
+                onChangeValue={val => setDistFilterValue(val)}
+              />
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: '6%',
+              marginBottom: 10,
+              zIndex: 1002, // Lower than District, higher than UC
+            }}>
+            {/* Search by Zone */}
+            <View style={{flex: 1, marginRight: 8, zIndex: 1002}}>
+              <DropDownPicker
+                open={zoneFilterOpen}
+                value={zoneFilterValue}
+                items={transformedZone}
+                setOpen={setZoneFilterOpen}
+                setValue={setZoneFilterValue}
+                placeholder="Filter by Zone"
+                placeholderStyle={{
+                  color: '#888',
+                  fontSize: 16,
+                }}
+                ArrowUpIconComponent={() => (
+                  <Icon name="chevron-up" size={25} color="#6E11B0" />
+                )}
+                ArrowDownIconComponent={() => (
+                  <Icon name="chevron-down" size={25} color="#6E11B0" />
+                )}
+                style={styles.dropDown}
+                textStyle={{
+                  fontSize: 14,
+                  color: '#222',
+                }}
+                labelProps={{
+                  numberOfLines: 1,
+                  ellipsizeMode: 'tail',
+                }}
+                dropDownContainerStyle={{
+                  borderRadius: 12,
+                  maxHeight: 200,
+                  zIndex: 1002,
+                }}
+                listItemContainerStyle={{
+                  height: 45,
+                }}
+                listItemLabelStyle={{
+                  fontSize: 16,
+                  color: '#222',
+                  overflow: 'hidden',
+                }}
+                containerStyle={{zIndex: 1002}}
+                onChangeValue={val => setZoneFilterValue(val)}
+              />
+            </View>
+            {/* Search by UC */}
+            <View style={{flex: 1, zIndex: 1001}}>
+              <DropDownPicker
+                open={ucFilterOpen}
+                value={ucFilterValue}
+                items={transformedUC}
+                setOpen={setUcFilterOpen}
+                setValue={setUcFilterValue}
+                placeholder="Filter by UC"
+                placeholderStyle={{
+                  color: '#888',
+                  fontSize: 16,
+                }}
+                ArrowUpIconComponent={() => (
+                  <Icon name="chevron-up" size={25} color="#6E11B0" />
+                )}
+                ArrowDownIconComponent={() => (
+                  <Icon name="chevron-down" size={25} color="#6E11B0" />
+                )}
+                style={styles.dropDown}
+                textStyle={{
+                  fontSize: 14,
+                  color: '#222',
+                }}
+                labelProps={{
+                  numberOfLines: 1,
+                  ellipsizeMode: 'tail',
+                }}
+                dropDownContainerStyle={{
+                  borderRadius: 12,
+                  maxHeight: 200,
+                  zIndex: 1001,
+                }}
+                listItemContainerStyle={{
+                  height: 45,
+                }}
+                listItemLabelStyle={{
+                  fontSize: 16,
+                  color: '#222',
+                  overflow: 'hidden',
+                }}
+                containerStyle={{zIndex: 1001}}
+                onChangeValue={val => setUcFilterValue(val)}
+              />
+            </View>
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredDonors.length === 0 ? (
+            <Text style={styles.noDataText}>No Donor found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredDonors.map(donor => (
+                <View key={donor._id} style={styles.listItem}>
+                  <View style={styles.avatar}>
+                    <Icon name="office-building" size={35} color="#6E11B0" />
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{donor.name}</Text>
+                    <Text style={styles.itemSubtitle}>{donor.contact}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setViewModalVisible(true);
+                        setSelectedDonor([donor]);
+                      }}>
+                      <Icon name="eye" size={20} color="#4ECDC4" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setAddModalVisible('UpdateDonor');
+                        setDonorUpdateForm({
+                          name: donor.name,
+                          address: donor.address,
+                          contact: donor.contact,
+                        });
+                        setSelectedDonor([donor]);
+                        setDistValue(donor.districtId?._id);
+                        setUCValue(donor.ucId?._id);
+                        setZoneValue(donor.zoneId?._id);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelectedDonor([donor]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{donor.name}</Text>
-                  <Text style={styles.itemSubtitle}>{donor.contact}</Text>
-                </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setViewModalVisible(true)}>
-                    <Icon name="eye" size={20} color="#4ECDC4" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-      </ScrollView>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
       {/* Add Role Modal */}
       <Modal
@@ -900,6 +1716,819 @@ const Users = () => {
         </View>
       </Modal>
 
+      {/* Add Donor */}
+      <Modal
+        transparent
+        visible={addModalVisible === 'Donor'}
+        animationType="fade"
+        onRequestClose={() => {
+          setAddModalVisible('');
+          setDistValue(null);
+          setUCValue(null);
+          setZoneValue(null);
+          setAddDonorForm(initialAddDonorForm);
+        }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setAddModalVisible('');
+                setAddDonorForm(initialAddDonorForm);
+                setDistValue(null);
+                setUCValue(null);
+                setZoneValue(null);
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              {selectedTab === 'System Users' && 'Add New User'}
+              {selectedTab === 'Donors' && 'Add New Donor'}
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter Name'}
+                value={addDonorForm.name}
+                onChangeText={t => donorOnChange('name', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Enter Contact'}
+                value={addDonorForm.contact}
+                onChangeText={t => donorOnChange('contact', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+                keyboardType="number-pad"
+              />
+              <TextInput
+                placeholder={'Enter Address'}
+                value={addDonorForm.address}
+                onChangeText={t => donorOnChange('address', t)}
+                placeholderTextColor={'#888'}
+                style={[
+                  styles.textInput,
+                  {
+                    height: 100,
+                    textAlignVertical: 'top',
+                  },
+                ]}
+                multiline
+                numberOfLines={4}
+              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={distOpen}
+                    value={distValue}
+                    items={transformedDist}
+                    setOpen={setDistOpen}
+                    setValue={setDistValue}
+                    placeholder="Select District"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={styles.dropDown}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                      zIndex: 1001,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('District');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={ucOpen}
+                    value={ucValue}
+                    items={transformedUC}
+                    setOpen={setUCOpen}
+                    setValue={setUCValue}
+                    placeholder="Select UC"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('UC');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={zoneOpen}
+                    value={zoneValue}
+                    items={transformedZone}
+                    setOpen={setZoneOpen}
+                    setValue={setZoneValue}
+                    setItems={setZoneItems}
+                    placeholder="Select Zone"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('Zone');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Buttons Row */}
+            <View
+              style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  addDonor();
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Add Donor
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => {
+                  setAddModalVisible('');
+                  setAddDonorForm(initialAddDonorForm);
+                  setDistValue(null);
+                  setUCValue(null);
+                  setZoneValue(null);
+                }}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update User */}
+      <Modal
+        transparent
+        visible={addModalVisible === 'updateUser'}
+        animationType="fade"
+        onRequestClose={() => {
+          setAddModalVisible('');
+          setUpdateForm(initialUpdateUserForm);
+          setSelectedUserID('');
+        }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setAddModalVisible('');
+                setUpdateForm(initialUpdateUserForm);
+                setSelectedUserID('');
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              {selectedTab === 'System Users' && 'Edit System User'}
+              {selectedTab === 'Donors' && 'Add New Donor'}
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Full Name'}
+                value={updateForm.name}
+                onChangeText={t => updateOnChange('name', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Email'}
+                value={updateForm.email}
+                onChangeText={t => updateOnChange('email', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Contact'}
+                value={updateForm.contact}
+                onChangeText={t => updateOnChange('contact', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'CNIC'}
+                value={updateForm.cnic}
+                onChangeText={t => updateOnChange('cnic', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.textInput,
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 15,
+                    backgroundColor: '#F8F9FC',
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // TODO: Implement file picker logic here
+                }}>
+                <Text
+                  style={{
+                    color: updateForm.img ? '#222' : '#888',
+                    fontSize: 16,
+                    width: '80%',
+                  }}
+                  numberOfLines={1}>
+                  {updateForm.img ? updateForm.img : 'Choose File'}
+                </Text>
+                <Icon name="file-upload" size={22} color="#6E11B0" />
+              </TouchableOpacity>
+              {updateForm.img ? (
+                <View style={{alignItems: 'flex-start', marginBottom: 15}}>
+                  <Image
+                    source={{uri: updateForm.img}}
+                    style={{width: 80, height: 80, borderRadius: 8}}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : null}
+
+              <View style={[styles.dropDownContainer, {width: '100%'}]}>
+                <DropDownPicker
+                  open={open}
+                  value={value}
+                  items={transformedRoles}
+                  setOpen={setOpen}
+                  setValue={setValue}
+                  placeholder="Select Role"
+                  placeholderStyle={{
+                    color: '#888',
+                    fontSize: 16,
+                  }}
+                  ArrowUpIconComponent={() => (
+                    <Icon name="chevron-up" size={25} color="#6E11B0" />
+                  )}
+                  ArrowDownIconComponent={() => (
+                    <Icon name="chevron-down" size={25} color="#6E11B0" />
+                  )}
+                  style={styles.dropDown}
+                  textStyle={{
+                    fontSize: 14,
+                    color: '#222',
+                  }}
+                  labelProps={{
+                    numberOfLines: 1,
+                    ellipsizeMode: 'tail',
+                  }}
+                  dropDownContainerStyle={{
+                    borderRadius: 12,
+                    maxHeight: 200,
+                    zIndex: 1000,
+                  }}
+                  listItemContainerStyle={{
+                    height: 45,
+                  }}
+                  listItemLabelStyle={{
+                    fontSize: 16,
+                    color: '#222',
+                    overflow: 'hidden',
+                  }}
+                />
+              </View>
+            </View>
+            {/* Buttons Row */}
+            <View
+              style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  updateUser();
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Update User
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => {
+                  setAddModalVisible('');
+                  setUpdateForm(initialUpdateUserForm);
+                  setSelectedUserID('');
+                }}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Donor */}
+      <Modal
+        transparent
+        visible={addModalVisible === 'UpdateDonor'}
+        animationType="fade"
+        onRequestClose={() => setAddModalVisible('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setAddModalVisible('');
+                setDonorUpdateForm(initialAddDonorForm);
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Edit Donor
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter Name'}
+                value={updateDonorForm.name}
+                onChangeText={t => donorUpdateOnChange('name', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+              />
+              <TextInput
+                placeholder={'Enter Contact'}
+                value={updateDonorForm.contact}
+                onChangeText={t => donorUpdateOnChange('contact', t)}
+                placeholderTextColor={'#888'}
+                style={styles.textInput}
+                keyboardType="number-pad"
+              />
+              <TextInput
+                placeholder={'Enter Address'}
+                value={updateDonorForm.address}
+                onChangeText={t => donorUpdateOnChange('address', t)}
+                placeholderTextColor={'#888'}
+                style={[
+                  styles.textInput,
+                  {
+                    height: 100,
+                    textAlignVertical: 'top',
+                  },
+                ]}
+                multiline
+                numberOfLines={4}
+              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View style={styles.dropDownContainer}>
+                  <DropDownPicker
+                    open={distOpen}
+                    value={distValue}
+                    items={transformedDist}
+                    setOpen={setDistOpen}
+                    setValue={setDistValue}
+                    placeholder="Select District"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={styles.dropDown}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                      zIndex: 1001,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={ucOpen}
+                    value={ucValue}
+                    items={transformedUC}
+                    setOpen={setUCOpen}
+                    setValue={setUCValue}
+                    placeholder="Select UC"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+              </View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={zoneOpen}
+                    value={zoneValue}
+                    items={transformedZone}
+                    setOpen={setZoneOpen}
+                    setValue={setZoneValue}
+                    setItems={setZoneItems}
+                    placeholder="Select Zone"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Buttons Row */}
+            <View
+              style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  updateDonor();
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Update
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => {
+                  setAddModalVisible('');
+                  setDonorUpdateForm(initialAddDonorForm);
+                  setDistValue(null);
+                  setUCValue(null);
+                  setZoneValue(null);
+                }}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Delete Modal */}
       <Modal
         transparent
@@ -974,6 +2603,7 @@ const Users = () => {
                 onPress={() => {
                   selectedTab === 'Roles' && deleteRole();
                   selectedTab === 'System Users' && deleteUser();
+                  selectedTab === 'Donors' && deleteDonor();
                 }}>
                 <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                   Yes, delete it
@@ -1106,6 +2736,251 @@ const Users = () => {
             justifyContent: 'center',
             alignItems: 'center',
           }}>
+          {selectedTab === 'System Users' && (
+            <View
+              style={{
+                width: '85%',
+                backgroundColor: '#fff',
+                borderRadius: 16,
+                padding: 20,
+                elevation: 10,
+                alignItems: 'center',
+                position: 'relative',
+              }}>
+              {/* Close Button */}
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 1,
+                  padding: 6,
+                }}
+                onPress={() => {
+                  setViewModalVisible(false);
+                  setSelectedUser([]);
+                }}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+              {/* Heading with Check Icon */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}>
+                <Icon
+                  name="check-circle"
+                  size={26}
+                  color="#4ECDC4"
+                  style={{marginRight: 8}}
+                />
+                <Text
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: 20,
+                    color: '#6E11B0',
+                    textAlign: 'center',
+                  }}>
+                  User Details
+                </Text>
+              </View>
+              {/* Profile Picture */}
+              <View
+                style={{
+                  marginTop: 10,
+                  marginBottom: 20,
+                  borderRadius: 50,
+                  overflow: 'hidden',
+                  width: 80,
+                  height: 80,
+                  backgroundColor: '#F0E6FF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Image
+                  source={{
+                    uri: selectedUser[0]?.img
+                      ? selectedUser[0]?.img
+                      : 'https://randomuser.me/api/portraits/men/1.jpg',
+                  }}
+                  style={{width: 80, height: 80}}
+                  resizeMode="cover"
+                />
+              </View>
+
+              <View style={{width: '100%'}}>
+                <Text
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    color: '#6E11B0',
+                    marginBottom: 10,
+                    textAlign: 'center',
+                  }}>
+                  Name:{' '}
+                  <Text style={{color: '#333'}}>{selectedUser[0]?.name}</Text>
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>
+                    Contact:
+                  </Text>{' '}
+                  {selectedUser[0]?.contact}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>
+                    Email:
+                  </Text>{' '}
+                  {selectedUser[0]?.email}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>CNIC:</Text>{' '}
+                  {selectedUser[0]?.cnic}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>Role:</Text>{' '}
+                  {selectedUser[0]?.roleId?.role
+                    ? selectedUser[0]?.roleId?.role
+                    : 'User'}
+                </Text>
+              </View>
+            </View>
+          )}
+          {selectedTab === 'Donors' && (
+            <View
+              style={{
+                width: '85%',
+                backgroundColor: '#fff',
+                borderRadius: 16,
+                padding: 20,
+                elevation: 10,
+                alignItems: 'center',
+                position: 'relative',
+              }}>
+              {/* Close Button */}
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 1,
+                  padding: 6,
+                }}
+                onPress={() => {
+                  setViewModalVisible(false);
+                  setSelectedDonor([]);
+                }}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+              {/* Heading with Check Icon */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}>
+                <Icon
+                  name="check-circle"
+                  size={26}
+                  color="#4ECDC4"
+                  style={{marginRight: 8}}
+                />
+                <Text
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: 20,
+                    color: '#6E11B0',
+                    textAlign: 'center',
+                  }}>
+                  Donor Details
+                </Text>
+              </View>
+              {/* Profile Picture */}
+              <View
+                style={{
+                  marginTop: 10,
+                  marginBottom: 20,
+                  borderRadius: 50,
+                  overflow: 'hidden',
+                  width: 80,
+                  height: 80,
+                  backgroundColor: '#F0E6FF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Image
+                  source={{
+                    uri: 'https://randomuser.me/api/portraits/men/1.jpg',
+                  }}
+                  style={{width: 80, height: 80}}
+                  resizeMode="cover"
+                />
+              </View>
+
+              <View style={{width: '100%'}}>
+                <Text
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    color: '#6E11B0',
+                    marginBottom: 10,
+                    textAlign: 'center',
+                  }}>
+                  Name:{' '}
+                  <Text style={{color: '#333'}}>{selectedDonor[0]?.name}</Text>
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>
+                    Contact:
+                  </Text>{' '}
+                  {selectedDonor[0]?.contact}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>
+                    Address:
+                  </Text>{' '}
+                  {selectedDonor[0]?.address}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>
+                    District:
+                  </Text>{' '}
+                  {selectedDonor[0]?.districtId?.district
+                    ? selectedDonor[0]?.districtId?.district
+                    : 'N/A'}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>Zone:</Text>{' '}
+                  {selectedDonor[0]?.zoneId?.zname
+                    ? selectedDonor[0]?.zoneId?.zname
+                    : 'N/A'}
+                </Text>
+                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                  <Text style={{fontWeight: 'bold', color: '#666'}}>UC:</Text>{' '}
+                  {selectedDonor[0]?.ucId?.uname
+                    ? selectedDonor[0]?.ucId?.uname
+                    : 'N/A'}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Add District, Zone and UC Modal */}
+      <Modal
+        transparent
+        visible={donorAddModal === 'District'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
           <View
             style={{
               width: '85%',
@@ -1113,8 +2988,6 @@ const Users = () => {
               borderRadius: 16,
               padding: 20,
               elevation: 10,
-              alignItems: 'center',
-              position: 'relative',
             }}>
             {/* Close Button */}
             <TouchableOpacity
@@ -1125,92 +2998,204 @@ const Users = () => {
                 zIndex: 1,
                 padding: 6,
               }}
-              onPress={() => {
-                setViewModalVisible(false);
-                setSelectedUser([]);
-              }}>
+              onPress={() => setDonorAddModal('')}>
               <Icon name="close" size={24} color="#333" />
             </TouchableOpacity>
-            {/* Heading with Check Icon */}
-            <View
+            {/* Text Input */}
+            <Text
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}>
-              <Icon
-                name="check-circle"
-                size={26}
-                color="#4ECDC4"
-                style={{marginRight: 8}}
-              />
-              <Text
-                style={{
-                  fontWeight: 'bold',
-                  fontSize: 20,
-                  color: '#6E11B0',
-                  textAlign: 'center',
-                }}>
-                User Details
-              </Text>
-            </View>
-            {/* Profile Picture */}
-            <View
-              style={{
-                marginTop: 10,
+                fontSize: 18,
+                fontWeight: '700',
                 marginBottom: 20,
-                borderRadius: 50,
-                overflow: 'hidden',
-                width: 80,
-                height: 80,
-                backgroundColor: '#F0E6FF',
-                alignItems: 'center',
-                justifyContent: 'center',
+                color: '#6E11B0',
               }}>
-              <Image
-                source={{
-                  uri: selectedUser[0]?.img
-                    ? selectedUser[0]?.img
-                    : 'https://randomuser.me/api/portraits/men/1.jpg',
+              Add New District
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={dist}
+                onChangeText={setDist}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
                 }}
-                style={{width: 80, height: 80}}
-                resizeMode="cover"
               />
             </View>
-
-            <View style={{width: '100%'}}>
-              <Text
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addDist();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add District
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        transparent
+        visible={donorAddModal === 'UC'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add Union Council
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={uc}
+                onChangeText={setUc}
+                placeholderTextColor={'#888'}
                 style={{
-                  fontWeight: 'bold',
-                  fontSize: 18,
-                  color: '#6E11B0',
-                  marginBottom: 10,
-                  textAlign: 'center',
-                }}>
-                Name:{' '}
-                <Text style={{color: '#333'}}>{selectedUser[0]?.name}</Text>
-              </Text>
-              <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>
-                  Contact:
-                </Text>{' '}
-                {selectedUser[0]?.contact}
-              </Text>
-              <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>Email:</Text>{' '}
-                {selectedUser[0]?.email}
-              </Text>
-              <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>CNIC:</Text>{' '}
-                {selectedUser[0]?.cnic}
-              </Text>
-              <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
-                <Text style={{fontWeight: 'bold', color: '#666'}}>Role:</Text>{' '}
-                {selectedUser[0]?.roleId?.role
-                  ? selectedUser[0]?.roleId?.role
-                  : 'User'}
-              </Text>
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
             </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addUC();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add Union Council
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        transparent
+        visible={donorAddModal === 'Zone'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add New Zone
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={uc}
+                onChangeText={setUc}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
+            </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addZone();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add Zone
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1282,7 +3267,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: '#6E11B0',
-    marginBottom: 20,
   },
   listItem: {
     backgroundColor: '#FFFFFF',
@@ -1334,8 +3318,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addBtnContainer: {
-    flexDirection: 'row-reverse',
-    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: '6%',
+    paddingTop: 15,
   },
   addButton: {
     flexDirection: 'row',

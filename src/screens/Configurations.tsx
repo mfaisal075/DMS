@@ -1,6 +1,9 @@
 import {
+  Animated,
+  Easing,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,46 +11,670 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import axios from 'axios';
+import BASE_URL from '../components/BASE_URL';
+import Toast from 'react-native-toast-message';
+
+interface Districts {
+  _id: string;
+  district: string;
+}
+
+interface UC {
+  _id: string;
+  uname: string;
+}
+
+interface Zones {
+  _id: string;
+  zname: string;
+}
+
+interface DonTypes {
+  _id: string;
+  dontype: string;
+}
 
 const Configurations = () => {
   const [selectedTab, setSelectedTab] = useState('District');
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [districts, setDistricts] = useState<Districts[]>([]);
+  const [allUC, setAllUC] = useState<UC[]>([]);
+  const [allZone, setAllZone] = useState<Zones[]>([]);
+  const [allDonType, setAllDonType] = useState<DonTypes[]>([]);
+  const [dist, setDist] = useState('');
+  const [uc, setUc] = useState('');
+  const [zone, setZone] = useState('');
+  const [donType, setDonType] = useState('');
+  const [updateDist, setUpdateDist] = useState('');
+  const [updateUc, setUpdateUc] = useState('');
+  const [updateZone, setUpdateZone] = useState('');
+  const [updateDonType, setUpdateDonType] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Array<{_id: string}>>([]);
 
-  const districtData = [
-    {id: '1', district: 'Gujrat District'},
-    {id: '2', district: 'Wazirabad District'},
-    {id: '3', district: 'Lahore District'},
-    {id: '4', district: 'Gujranwala District'},
-    {id: '5', district: 'Sheikhupura District'},
-  ];
+  // States for search
+  const [searchDistrict, setSearchDistrict] = useState('');
+  const [searchZone, setSearchZone] = useState('');
+  const [searchUC, setSearchUC] = useState('');
+  const [searchDonType, setSearchDonType] = useState('');
 
-  const zoneData = [
-    {id: '1', zone: 'Gujrat Zone'},
-    {id: '2', zone: 'Wazirabad Zone'},
-    {id: '3', zone: 'Lahore Zone'},
-    {id: '4', zone: 'Gujranwala Zone'},
-    {id: '5', zone: 'Sheikhupura Zone'},
-  ];
+  // Get Districts
+  const getAllDist = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/District/getAllDist`);
+      setDistricts(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const ucData = [
-    {id: '1', uc: 'UC Kalaske'},
-    {id: '2', uc: 'Union council 70'},
-    {id: '3', uc: 'Union council 34'},
-    {id: '4', uc: 'Union council 65'},
-    {id: '5', uc: 'Union council 15'},
-  ];
+  // Delete District
+  const deleteDist = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.delete(
+        `${BASE_URL}/District/delDist/${selected[0]._id}`,
+      );
 
-  const donationType = [
-    {id: '1', type: 'Library Fund'},
-    {id: '2', type: 'Community fund'},
-    {id: '3', type: 'Welfare donation'},
-    {id: '4', type: 'Health Fund'},
-    {id: '5', type: 'New Type'},
-  ];
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'District deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getAllDist();
+        setDeleteModalVisible(false);
+        setSelected([]);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update District
+  const updateDistrict = async () => {
+    if (!updateDist.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a district name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Check if district already exists (case-insensitive)
+      const exists = districts.some(
+        d =>
+          d.district.trim().toLowerCase() === updateDist.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A district with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.put(
+        `${BASE_URL}/District/updateDist/${selected[0]._id}`,
+        {
+          district: updateDist.trim(),
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'District Updated successfully!',
+          visibilityTime: 1500,
+        });
+        setUpdateDist('');
+        setEditModalVisible(false);
+        setSelected([]);
+        getAllDist();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get Zones
+  const getAllZone = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/Zone/getAllZone`);
+      setAllZone(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete Zone
+  const deleteZone = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.delete(
+        `${BASE_URL}/Zone/delZone/${selected[0]._id}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Zone deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getAllZone();
+        setDeleteModalVisible(false);
+        setSelected([]);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update Zone
+  const editZone = async () => {
+    if (!updateZone.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Zone name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Check if district already exists (case-insensitive)
+      const exists = allZone.some(
+        d => d.zname.trim().toLowerCase() === updateZone.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A Zone with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.put(
+        `${BASE_URL}/Zone/updateZone/${selected[0]._id}`,
+        {
+          zname: updateZone.trim(),
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Zone Updated successfully!',
+          visibilityTime: 1500,
+        });
+        setUpdateZone('');
+        setEditModalVisible(false);
+        setSelected([]);
+        getAllZone();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get UC
+  const getAllUC = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/UC/getAllUC`);
+      setAllUC(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete UC
+  const deleteUC = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.delete(`${BASE_URL}/UC/delUC/${selected[0]._id}`);
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'UC deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getAllUC();
+        setDeleteModalVisible(false);
+        setSelected([]);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update UC
+  const editUC = async () => {
+    if (!updateUc.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a UC name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Check if district already exists (case-insensitive)
+      const exists = allUC.some(
+        d => d.uname.trim().toLowerCase() === updateUc.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A UC with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.put(
+        `${BASE_URL}/UC/updateUC/${selected[0]._id}`,
+        {
+          uname: updateUc.trim(),
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'UC Updated successfully!',
+          visibilityTime: 1500,
+        });
+        setUpdateUc('');
+        setEditModalVisible(false);
+        setSelected([]);
+        getAllUC();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get Donations Type
+  const getAllDonType = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/donType/getAllDonType`);
+      setAllDonType(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete UC
+  const deleteDonType = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.delete(
+        `${BASE_URL}/dontype/delType/${selected[0]._id}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation Type deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getAllDonType();
+        setDeleteModalVisible(false);
+        setSelected([]);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add District
+  const addDist = async () => {
+    if (!dist.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a district name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = districts.some(
+        d => d.district.trim().toLowerCase() === dist.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A district with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/District/addDist`, {
+        district: dist.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'District added successfully!',
+          visibilityTime: 1500,
+        });
+        setDist('');
+        setModalVisible(false);
+        getAllDist();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add UC
+  const addUC = async () => {
+    if (!uc.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a UC name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = allUC.some(
+        d => d.uname.trim().toLowerCase() === uc.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate UC',
+          text2: 'A UC with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/UC/addUC`, {
+        uname: uc.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'UC added successfully!',
+          visibilityTime: 1500,
+        });
+        setUc('');
+        setModalVisible(false);
+        getAllUC();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add Zone
+  const addZone = async () => {
+    if (!zone.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Zone name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = allZone.some(
+        d => d.zname.trim().toLowerCase() === zone.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate Zone',
+          text2: 'A Zone with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/Zone/addZone`, {
+        zname: zone.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Zone added successfully!',
+          visibilityTime: 1500,
+        });
+        setZone('');
+        setModalVisible(false);
+        getAllZone();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add Donation Type
+  const addDonType = async () => {
+    if (!donType.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Donation Type name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const exists = allDonType.some(
+        d => d.dontype.trim().toLowerCase() === donType.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate Zone',
+          text2: 'A Donation Type with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/donType/addDonType`, {
+        dontype: donType.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation Type added successfully!',
+          visibilityTime: 1500,
+        });
+        setDonType('');
+        setModalVisible(false);
+        getAllDonType();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update Donation Type
+  const editDonType = async () => {
+    if (!updateDonType.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Donation Type name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Check if district already exists (case-insensitive)
+      const exists = allDonType.some(
+        d =>
+          d.dontype.trim().toLowerCase() === updateDonType.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A Donation with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.put(
+        `${BASE_URL}/dontype/updateType/${selected[0]._id}`,
+        {
+          dontype: updateDonType.trim(),
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation Type Updated successfully!',
+          visibilityTime: 1500,
+        });
+        setUpdateDonType('');
+        setEditModalVisible(false);
+        setSelected([]);
+        getAllDonType();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getAllDist();
+    getAllUC();
+    getAllZone();
+    getAllDonType();
+  }, []);
+
+  const LoadingSpinner = () => {
+    const spinValue = new Animated.Value(0);
+
+    useEffect(() => {
+      Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingSquare}>
+          <Animated.View
+            style={[styles.dashedCircle, {transform: [{rotate: spin}]}]}
+          />
+        </View>
+      </View>
+    );
+  };
 
   // Tab buttons
   const tabs = [
@@ -56,6 +683,36 @@ const Configurations = () => {
     {id: 'UC', icon: 'account-group', color: '#FF9500'},
     {id: 'Donation Type', icon: 'hand-heart', color: '#AF52DE'},
   ];
+
+  const filteredDist = districts.filter(dist => {
+    const matchesName = dist.district
+      .toLowerCase()
+      .includes(searchDistrict.toLowerCase());
+
+    return matchesName;
+  });
+
+  const filteredZone = allZone.filter(zone => {
+    const matchesName = zone.zname
+      .toLowerCase()
+      .includes(searchZone.toLowerCase());
+
+    return matchesName;
+  });
+
+  const filteredUC = allUC.filter(uc => {
+    const matchesName = uc.uname.toLowerCase().includes(searchUC.toLowerCase());
+
+    return matchesName;
+  });
+
+  const filteredDonType = allDonType.filter(type => {
+    const matchesName = type.dontype
+      .toLowerCase()
+      .includes(searchDonType.toLowerCase());
+
+    return matchesName;
+  });
   return (
     <View style={styles.container}>
       {/* Top Bar */}
@@ -103,144 +760,248 @@ const Configurations = () => {
           ))}
         </View>
       </View>
+      {/* District List */}
 
-      <ScrollView style={styles.contentContainer}>
-        {/* District List */}
-        {selectedTab === 'District' && (
-          <>
+      {selectedTab === 'District' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>Configure District</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New District</Text>
-              </TouchableOpacity>
-            </View>
-            {districtData.map(district => (
-              <View key={district.id} style={styles.listItem}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{district.district}</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setModalVisible(true)}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New District</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.searchFilterContainer}>
+            <TextInput
+              placeholder="Search District"
+              placeholderTextColor="#888"
+              style={[styles.textInput, {marginBottom: 0}]}
+              value={searchDistrict}
+              onChangeText={setSearchDistrict}
+            />
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredDist.length === 0 ? (
+            <Text style={styles.noDataText}>No District found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredDist.map(district => (
+                <View key={district._id} style={styles.listItem}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{district.district}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setEditModalVisible(true);
+                        setSelected([district]);
+                        setUpdateDist(district.district);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelected([district]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-        {/* Zone List */}
-        {selectedTab === 'Zone/Tehsil' && (
-          <>
+      {/* Zone List */}
+      {selectedTab === 'Zone/Tehsil' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>Configure Zone</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New Zone</Text>
-              </TouchableOpacity>
-            </View>
-            {zoneData.map(zone => (
-              <View key={zone.id} style={styles.listItem}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{zone.zone}</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setModalVisible(true)}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New Zone</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.searchFilterContainer}>
+            <TextInput
+              placeholder="Search Zone"
+              placeholderTextColor="#888"
+              style={[styles.textInput, {marginBottom: 0}]}
+              value={searchZone}
+              onChangeText={setSearchZone}
+            />
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredZone.length === 0 ? (
+            <Text style={styles.noDataText}>No Zone found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredZone.map(zone => (
+                <View key={zone._id} style={styles.listItem}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{zone.zname}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setEditModalVisible(true);
+                        setSelected([zone]);
+                        setUpdateZone(zone.zname);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelected([zone]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-        {/* UC List */}
-        {selectedTab === 'UC' && (
-          <>
+      {/* UC List */}
+      {selectedTab === 'UC' && (
+        <>
+          <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>Configure UC</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add New UC</Text>
-              </TouchableOpacity>
-            </View>
-            {ucData.map(uc => (
-              <View key={uc.id} style={styles.listItem}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{uc.uc}</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setModalVisible(true)}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add New UC</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.searchFilterContainer}>
+            <TextInput
+              placeholder="Search Union Council"
+              placeholderTextColor="#888"
+              style={[styles.textInput, {marginBottom: 0}]}
+              value={searchUC}
+              onChangeText={setSearchUC}
+            />
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredUC.length === 0 ? (
+            <Text style={styles.noDataText}>No UC found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredUC.map(uc => (
+                <View key={uc._id} style={styles.listItem}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{uc.uname}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setEditModalVisible(true);
+                        setSelected([uc]);
+                        setUpdateUc(uc.uname);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelected([uc]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
-        {/* Donation Type List */}
-        {selectedTab === 'Donation Type' && (
-          <>
-            <Text style={styles.sectionTitle}>Configure Donation Type</Text>
-            <View style={styles.addBtnContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}>
-                <Icon name="plus" size={18} color={'#fff'} />
-                <Text style={styles.btnText}>Add Donation Type</Text>
-              </TouchableOpacity>
-            </View>
-            {donationType.map(type => (
-              <View key={type.id} style={styles.listItem}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{type.type}</Text>
+      {/* Donation Type List */}
+      {selectedTab === 'Donation Type' && (
+        <>
+          <View style={styles.addBtnContainer}>
+            <Text style={[styles.sectionTitle, {fontSize: 14}]}>
+              Configure Donation Type
+            </Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setModalVisible(true)}>
+              <Icon name="plus" size={18} color={'#fff'} />
+              <Text style={styles.btnText}>Add Donation Type</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.searchFilterContainer}>
+            <TextInput
+              placeholder="Search Donation Type"
+              placeholderTextColor="#888"
+              style={[styles.textInput, {marginBottom: 0}]}
+              value={searchDonType}
+              onChangeText={setSearchDonType}
+            />
+          </View>
+          {loading ? (
+            <LoadingSpinner />
+          ) : filteredDonType.length === 0 ? (
+            <Text style={styles.noDataText}>No Donation Type found</Text>
+          ) : (
+            <ScrollView
+              style={styles.contentContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {filteredDonType.map(type => (
+                <View key={type._id} style={styles.listItem}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle}>{type.dontype}</Text>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setEditModalVisible(true);
+                        setSelected([type]);
+                        setUpdateDonType(type.dontype);
+                      }}>
+                      <Icon name="pencil" size={20} color="#6E11B0" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setDeleteModalVisible(true);
+                        setSelected([type]);
+                      }}>
+                      <Icon name="delete" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setEditModalVisible(true)}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setDeleteModalVisible(true)}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-      </ScrollView>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
       {/* Add Modal */}
       <Modal
@@ -302,6 +1063,28 @@ const Configurations = () => {
                     : ''
                 }
                 placeholderTextColor={'#888'}
+                value={
+                  selectedTab === 'District'
+                    ? dist
+                    : selectedTab === 'Zone/Tehsil'
+                    ? zone
+                    : selectedTab === 'UC'
+                    ? uc
+                    : selectedTab === 'Donation Type'
+                    ? donType
+                    : ''
+                }
+                onChangeText={
+                  selectedTab === 'District'
+                    ? t => setDist(t)
+                    : selectedTab === 'Zone/Tehsil'
+                    ? t => setZone(t)
+                    : selectedTab === 'UC'
+                    ? t => setUc(t)
+                    : selectedTab === 'Donation Type'
+                    ? t => setDonType(t)
+                    : () => {}
+                }
                 style={{
                   borderWidth: 1,
                   borderColor: '#E0E0E0',
@@ -320,7 +1103,12 @@ const Configurations = () => {
                 paddingVertical: 12,
                 alignItems: 'center',
               }}
-              onPress={() => {}}>
+              onPress={() => {
+                selectedTab === 'District' && addDist();
+                selectedTab === 'Zone/Tehsil' && addZone();
+                selectedTab === 'UC' && addUC();
+                selectedTab === 'Donation Type' && addDonType();
+              }}>
               <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                 Add {selectedTab === 'District' && 'District'}
                 {selectedTab === 'Zone/Tehsil' && 'Zone'}
@@ -406,8 +1194,10 @@ const Configurations = () => {
                   marginRight: 8,
                 }}
                 onPress={() => {
-                  // handle delete logic here
-                  setDeleteModalVisible(false);
+                  selectedTab === 'District' && deleteDist();
+                  selectedTab === 'Zone/Tehsil' && deleteZone();
+                  selectedTab === 'UC' && deleteUC();
+                  selectedTab === 'Donation Type' && deleteDonType();
                 }}>
                 <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                   Yes, delete it
@@ -440,7 +1230,10 @@ const Configurations = () => {
         transparent
         visible={editModalVisible}
         animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}>
+        onRequestClose={() => {
+          setEditModalVisible(false);
+          setSelected([]);
+        }}>
         <View
           style={{
             flex: 1,
@@ -465,7 +1258,14 @@ const Configurations = () => {
                 zIndex: 1,
                 padding: 6,
               }}
-              onPress={() => setEditModalVisible(false)}>
+              onPress={() => {
+                setEditModalVisible(false);
+                setUpdateDist('');
+                setUpdateZone('');
+                setUpdateUc('');
+                setUpdateDonType('');
+                setSelected([]);
+              }}>
               <Icon name="close" size={24} color="#333" />
             </TouchableOpacity>
             {/* Text Input */}
@@ -495,6 +1295,28 @@ const Configurations = () => {
                     : ''
                 }
                 placeholderTextColor={'#888'}
+                value={
+                  selectedTab === 'District'
+                    ? updateDist
+                    : selectedTab === 'Zone/Tehsil'
+                    ? updateZone
+                    : selectedTab === 'UC'
+                    ? updateUc
+                    : selectedTab === 'Donation Type'
+                    ? updateDonType
+                    : ''
+                }
+                onChangeText={
+                  selectedTab === 'District'
+                    ? t => setUpdateDist(t)
+                    : selectedTab === 'Zone/Tehsil'
+                    ? t => setUpdateZone(t)
+                    : selectedTab === 'UC'
+                    ? t => setUpdateUc(t)
+                    : selectedTab === 'Donation Type'
+                    ? t => setUpdateDonType(t)
+                    : () => {}
+                }
                 style={{
                   borderWidth: 1,
                   borderColor: '#E0E0E0',
@@ -513,7 +1335,12 @@ const Configurations = () => {
                 paddingVertical: 12,
                 alignItems: 'center',
               }}
-              onPress={() => {}}>
+              onPress={() => {
+                selectedTab === 'District' && updateDistrict();
+                selectedTab === 'Zone/Tehsil' && editZone();
+                selectedTab === 'UC' && editUC();
+                selectedTab === 'Donation Type' && editDonType();
+              }}>
               <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                 Save Changes
               </Text>
@@ -585,14 +1412,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#6E11B0',
-    marginBottom: 20,
   },
   addBtnContainer: {
-    flexDirection: 'row-reverse',
-    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: '6%',
+    paddingTop: 15,
   },
   addButton: {
     flexDirection: 'row',
@@ -648,5 +1477,59 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: 20,
+  },
+
+  //Loading Component
+  loadingContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingSquare: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+  },
+  dashedCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 7,
+    borderColor: '#6E11B0',
+    ...Platform.select({
+      ios: {
+        borderStyle: 'dashed',
+      },
+      android: {
+        borderStyle: 'dotted',
+      },
+    }),
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#8E8E93',
+    fontSize: 16,
+    marginTop: 20,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#F8F9FC',
+    marginBottom: 15,
+  },
+  searchFilterContainer: {
+    paddingHorizontal: 20,
+    marginVertical: 15,
   },
 });

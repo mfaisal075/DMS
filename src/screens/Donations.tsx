@@ -1,6 +1,8 @@
 import {
+  Easing,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,10 +10,65 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DatePicker from 'react-native-date-picker';
+import axios from 'axios';
+import BASE_URL from '../components/BASE_URL';
+import Toast from 'react-native-toast-message';
+import {Animated} from 'react-native';
+
+interface Donation {
+  _id: string;
+  donor: {
+    _id: string;
+    name: string;
+    contact: string;
+    address: string;
+  };
+  receiptNumber: string;
+  districtId: {
+    _id: string;
+    district: string;
+  };
+  zoneId: {
+    _id: string;
+    zname: string;
+  };
+  ucId: {
+    _id: string;
+    uname: string;
+  };
+  amount: string;
+  date: string;
+  remarks: string;
+  paymentMode: string;
+  donationType: {
+    _id: string;
+    dontype: string;
+  };
+}
+
+interface Districts {
+  _id: string;
+  district: string;
+}
+
+interface UC {
+  _id: string;
+  uname: string;
+}
+
+interface Zones {
+  _id: string;
+  zname: string;
+}
+
+interface DonTypes {
+  _id: string;
+  dontype: string;
+}
 
 const Donations = ({navigation}: any) => {
   const [selectedTab, setSelectedTab] = useState('All Donations');
@@ -20,17 +77,140 @@ const Donations = ({navigation}: any) => {
   const [date, setDate] = useState(new Date());
   const [dateOpen, setDateOpen] = useState(false);
   const [modalVisible, setModalVisible] = useState('');
-  const [ucOpen, setUCOpen] = useState(false);
-  const [ucValue, setUCValue] = useState(null);
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
   const [fromDateOpen, setFromDateOpen] = useState(false);
   const [toDateOpen, setToDateOpen] = useState(false);
-  const [distValue, setDistValue] = useState(null);
-  const [distOpen, setDistOpen] = useState(false);
-  const [zoneValue, setZoneValue] = useState(null);
-  const [zoneOpen, setZoneOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [selectedDon, setSelectedDon] = useState<Donation[]>([]);
+  const [searchDonor, setSearchDonor] = useState('');
+  const [distFilterOpen, setDistFilterOpen] = useState(false);
+  const [distFilterValue, setDistFilterValue] = useState<string | null>(null);
+  const [ucFilterOpen, setUCFilterOpen] = useState(false);
+  const [ucFilterValue, setUCFilterValue] = useState<string | null>(null);
+  const [zoneFilterOpen, setZoneFilterOpen] = useState(false);
+  const [zoneFilterValue, setZoneFilterValue] = useState<string | null>(null);
+  const [donTypeFilterOpen, setDonTypeFilterOpen] = useState(false);
+  const [donTypeFilterValue, setDonTypeFilterValue] = useState<string | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(false);
+  const [searchReceipt, setSearchReceipt] = useState('');
+
+  // District Dropdown
+  const [districts, setDistricts] = useState<Districts[]>([]);
+  const transformedDist = districts.map(dist => ({
+    label: dist.district,
+    value: dist._id,
+  }));
+
+  //Get Districts
+  const getAllDist = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/District/getAllDist`);
+      setDistricts(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // UC Dropdown
+  const [ucItems, setUCItems] = useState<UC[]>([]);
+  const transformedUC = ucItems.map(uc => ({
+    label: uc.uname,
+    value: uc._id,
+  }));
+
+  // Zone Dropdown
+  const [zoneItems, setZoneItems] = useState<Zones[]>([]);
+  const transformedZone = zoneItems.map(zone => ({
+    label: zone.zname,
+    value: zone._id,
+  }));
+
+  // Donation Type Dropdown
+  const [allDonType, setAllDonType] = useState<DonTypes[]>([]);
+  const transformedDonType = allDonType.map(type => ({
+    label: type.dontype,
+    value: type._id,
+  }));
+
+  // Get UC
+  const getAllUC = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/UC/getAllUC`);
+      setUCItems(res.data);
+    } catch (error) {}
+  };
+
+  // Get Zones
+  const getAllZone = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/Zone/getAllZone`);
+
+      setZoneItems(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Get Donations Type
+  const getAllDonType = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/donType/getAllDonType`);
+      setAllDonType(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Get All Donations
+  const getReceivedDonations = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/Donation/getReceivedDonations`);
+      setDonations(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete Donation
+  const deleteDonation = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.delete(
+        `${BASE_URL}/Donation/delDonation/${selectedDon[0]._id}`,
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation deleted successfully!',
+          visibilityTime: 1500,
+        });
+        getReceivedDonations();
+        setModalVisible('');
+        setSelectedDon([]);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getReceivedDonations();
+    getAllDist();
+    getAllDonType();
+    getAllUC();
+    getAllZone();
+  }, []);
 
   const [items, setItems] = useState([
     {label: 'Donation type 1', value: 1},
@@ -42,89 +222,133 @@ const Donations = ({navigation}: any) => {
     {label: 'New type', value: 7},
   ]);
 
-  const donationsData = [
-    {
-      id: '1',
-      receipt: 'DON-0021',
-      donor: 'Rashid',
-      contact: '030048556230',
-      amount: '3500',
-      type: 'Health Fund',
-      date: '6/14/2025',
-    },
-    {
-      id: '2',
-      receipt: 'DON-0022',
-      donor: 'M Adan Hunjra',
-      contact: '030048956230',
-      amount: '50000',
-      type: 'Welfare donation',
-      date: '6/3/2025',
-    },
-    {
-      id: '3',
-      receipt: 'DON-0023',
-      donor: 'Danish Miza',
-      contact: '030048956230',
-      amount: '1000',
-      type: 'Library Fund',
-      date: '6/22/2025',
-    },
-    {
-      id: '4',
-      receipt: 'DON-0024',
-      donor: 'Bilal Yousuf',
-      contact: '030048956230',
-      amount: '15000',
-      type: 'Health Fund',
-      date: '6/23/2025',
-    },
-    {
-      id: '5',
-      receipt: 'DON-0025',
-      donor: 'Asghar Ali',
-      contact: '030048956230',
-      amount: '800',
-      type: 'Welfare donation',
-      date: '6/4/2025',
-    },
-  ];
-
-  const [districtItems, setDistrictItems] = useState([
-    {label: 'Wazirabad District', value: 1},
-    {label: 'Lahore District', value: 2},
-    {label: 'Gujranwala District', value: 3},
-    {label: 'Sheikhupura District', value: 4},
-    {label: 'Rawalpindi District', value: 5},
-    {label: 'Mardan District', value: 6},
-    {label: 'Karachi District', value: 7},
-  ]);
-
-  const [zoneItems, setZoneItems] = useState([
-    {label: 'Wazirabad Zone', value: 1},
-    {label: 'Lahore Zone', value: 2},
-    {label: 'Gujranwala Zone', value: 3},
-    {label: 'Sheikhupura Zone', value: 4},
-    {label: 'Rawalpindi Zone', value: 5},
-    {label: 'Mardan Zone', value: 6},
-    {label: 'Karachi Zone', value: 7},
-  ]);
-
-  const [ucItems, setUCItems] = useState([
-    {label: 'Union council 20', value: 1},
-    {label: 'Union council 3', value: 2},
-    {label: 'UC 1 Ali Pur Chattha', value: 3},
-    {label: 'UC Kalaske', value: 4},
-    {label: 'Union council 70', value: 5},
-    {label: 'Union council 18', value: 6},
-    {label: 'New UC', value: 7},
-  ]);
-
   // Tab buttons
   const tabs = [
     {id: 'All Donations', icon: 'charity', color: '#4ECDC4'},
     {id: 'Receive Donations', icon: 'hand-heart', color: '#FFD166'},
   ];
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ''; // Handle empty or invalid dates
+
+    const date = new Date(dateString); // Parse the date string
+    const day = String(date.getDate()).padStart(2, '0'); // Ensure 2 digits
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year}`; // Return formatted date
+  };
+
+  // Converts a number (e.g. 1234) to words (e.g. "One Thousand Two Hundred Thirty Four")
+  function numberToWords(num: number): string {
+    if (isNaN(num) || num === 0) return 'Zero';
+
+    const belowTwenty = [
+      '',
+      'One',
+      'Two',
+      'Three',
+      'Four',
+      'Five',
+      'Six',
+      'Seven',
+      'Eight',
+      'Nine',
+      'Ten',
+      'Eleven',
+      'Twelve',
+      'Thirteen',
+      'Fourteen',
+      'Fifteen',
+      'Sixteen',
+      'Seventeen',
+      'Eighteen',
+      'Nineteen',
+    ];
+    const tens = [
+      '',
+      '',
+      'Twenty',
+      'Thirty',
+      'Forty',
+      'Fifty',
+      'Sixty',
+      'Seventy',
+      'Eighty',
+      'Ninety',
+    ];
+    const thousands = ['', 'Thousand', 'Million', 'Billion'];
+
+    function helper(n: number): string {
+      if (n === 0) return '';
+      if (n < 20) return belowTwenty[n] + ' ';
+      if (n < 100) return tens[Math.floor(n / 10)] + ' ' + helper(n % 10);
+      if (n < 1000)
+        return belowTwenty[Math.floor(n / 100)] + ' Hundred ' + helper(n % 100);
+      for (let i = 0, unit = 1000; i < thousands.length; i++, unit *= 1000) {
+        if (n < unit * 1000) {
+          return (
+            helper(Math.floor(n / unit)) + thousands[i] + ' ' + helper(n % unit)
+          );
+        }
+      }
+      return '';
+    }
+
+    return helper(num).replace(/\s+/g, ' ').trim();
+  }
+
+  // Spinner
+  const LoadingSpinner = () => {
+    const spinValue = new Animated.Value(0);
+
+    useEffect(() => {
+      Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingSquare}>
+          <Animated.View
+            style={[styles.dashedCircle, {transform: [{rotate: spin}]}]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  const filteredDonations = donations.filter(don => {
+    const matchesName = don?.donor?.name
+      .toLowerCase()
+      .includes(searchDonor.toLowerCase());
+
+    const matchesType =
+      !donTypeFilterValue || don?.donationType?._id === donTypeFilterValue;
+
+    const matchesDist =
+      !distFilterValue || don?.districtId?._id === distFilterValue;
+
+    const matchesZone =
+      !zoneFilterValue || don?.zoneId?._id === zoneFilterValue;
+
+    const matchesUC = !ucFilterValue || don?.ucId?._id === ucFilterValue;
+
+    return (
+      matchesName && matchesType && matchesDist && matchesZone && matchesUC
+    );
+  });
 
   return (
     <View style={styles.container}>
@@ -174,554 +398,506 @@ const Donations = ({navigation}: any) => {
 
       {/* Content Area */}
       {selectedTab === 'All Donations' && (
-        <ScrollView style={styles.contentContainer}>
-          <>
-            <View
-              style={{
-                backgroundColor: 'transparent',
-                width: '100%',
-                marginBottom: 10,
-              }}>
-              <TouchableOpacity
-                style={styles.filterHeader}
-                onPress={() => setFiltersExpanded(!filtersExpanded)}>
-                <Text style={styles.filterHeaderText}>Filters</Text>
-                <Icon
-                  name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={24}
-                  color="#6E11B0"
-                />
-              </TouchableOpacity>
-              {filtersExpanded && (
-                <>
-                  <View style={styles.row}>
-                    <TextInput
-                      style={[styles.textInput, {width: '100%'}]}
-                      placeholder="Donor Name"
-                      placeholderTextColor={'#666'}
+        <View style={{flex: 1}}>
+          <View
+            style={{
+              backgroundColor: 'transparent',
+              width: '90%',
+              marginVertical: 10,
+              alignSelf: 'center',
+            }}>
+            <TouchableOpacity
+              style={styles.filterHeader}
+              onPress={() => setFiltersExpanded(!filtersExpanded)}>
+              <Text style={styles.filterHeaderText}>Filters</Text>
+              <Icon
+                name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
+                size={24}
+                color="#6E11B0"
+              />
+            </TouchableOpacity>
+            {filtersExpanded && (
+              <>
+                <View style={styles.row}>
+                  <TextInput
+                    style={[styles.textInput, {width: '100%'}]}
+                    placeholder="Search  Name"
+                    placeholderTextColor={'#666'}
+                    value={searchDonor}
+                    onChangeText={setSearchDonor}
+                  />
+                </View>
+                <View style={styles.row}>
+                  <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                    <DropDownPicker
+                      open={donTypeFilterOpen}
+                      value={donTypeFilterValue}
+                      items={transformedDonType}
+                      setOpen={setDonTypeFilterOpen}
+                      setValue={setDonTypeFilterValue}
+                      placeholder="Donations By Type"
+                      placeholderStyle={{
+                        color: '#888',
+                        fontSize: 16,
+                      }}
+                      ArrowUpIconComponent={() => (
+                        <Icon name="chevron-up" size={25} color="#6E11B0" />
+                      )}
+                      ArrowDownIconComponent={() => (
+                        <Icon name="chevron-down" size={25} color="#6E11B0" />
+                      )}
+                      style={styles.dropDown}
+                      textStyle={{
+                        fontSize: 14,
+                        color: '#222',
+                      }}
+                      labelProps={{
+                        numberOfLines: 1,
+                        ellipsizeMode: 'tail',
+                      }}
+                      dropDownContainerStyle={{
+                        borderRadius: 12,
+                        maxHeight: 200,
+                        zIndex: 1000,
+                      }}
+                      listItemContainerStyle={{
+                        height: 45,
+                      }}
+                      listItemLabelStyle={{
+                        fontSize: 16,
+                        color: '#222',
+                        overflow: 'hidden',
+                      }}
                     />
                   </View>
-                  <View style={styles.row}>
-                    <TouchableOpacity
+                  <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                    <DropDownPicker
+                      open={distFilterOpen}
+                      value={distFilterValue}
+                      items={transformedDist}
+                      setOpen={setDistFilterOpen}
+                      setValue={setDistFilterValue}
+                      placeholder="Donations By District"
+                      placeholderStyle={{
+                        color: '#888',
+                        fontSize: 16,
+                      }}
+                      ArrowUpIconComponent={() => (
+                        <Icon name="chevron-up" size={25} color="#6E11B0" />
+                      )}
+                      ArrowDownIconComponent={() => (
+                        <Icon name="chevron-down" size={25} color="#6E11B0" />
+                      )}
+                      style={styles.dropDown}
+                      textStyle={{
+                        fontSize: 14,
+                        color: '#222',
+                      }}
+                      labelProps={{
+                        numberOfLines: 1,
+                        ellipsizeMode: 'tail',
+                      }}
+                      dropDownContainerStyle={{
+                        borderRadius: 12,
+                        maxHeight: 200,
+                        zIndex: 1001,
+                      }}
+                      listItemContainerStyle={{
+                        height: 45,
+                      }}
+                      listItemLabelStyle={{
+                        fontSize: 16,
+                        color: '#222',
+                        overflow: 'hidden',
+                      }}
+                    />
+                  </View>
+                </View>
+                <View style={styles.row}>
+                  <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                    <DropDownPicker
+                      open={zoneFilterOpen}
+                      value={zoneFilterValue}
+                      items={transformedZone}
+                      setOpen={setZoneFilterOpen}
+                      setValue={setZoneFilterValue}
+                      placeholder="Donations By Zone"
+                      placeholderStyle={{
+                        color: '#888',
+                        fontSize: 16,
+                      }}
+                      ArrowUpIconComponent={() => (
+                        <Icon name="chevron-up" size={25} color="#6E11B0" />
+                      )}
+                      ArrowDownIconComponent={() => (
+                        <Icon name="chevron-down" size={25} color="#6E11B0" />
+                      )}
                       style={[
-                        styles.textInput,
+                        styles.dropDown,
                         {
-                          width: '48%',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          backgroundColor: 'rgba(245, 245, 245, 0.2)',
-                          marginTop: 8,
+                          zIndex: 999,
                         },
                       ]}
-                      onPress={() => setFromDateOpen(true)}
-                      activeOpacity={0.8}>
-                      <Text style={{color: '#222', fontSize: 16}}>
-                        {fromDate ? fromDate.toLocaleDateString() : 'From Date'}
-                      </Text>
-                      <Icon name="calendar" size={22} color="#6E11B0" />
-                      <DatePicker
-                        modal
-                        open={fromDateOpen}
-                        mode="date"
-                        date={fromDate}
-                        onConfirm={date => {
-                          setFromDateOpen(false);
-                          setFromDate(date);
-                        }}
-                        onCancel={() => {
-                          setFromDateOpen(false);
-                        }}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                      textStyle={{
+                        fontSize: 14,
+                        color: '#222',
+                      }}
+                      labelProps={{
+                        numberOfLines: 1,
+                        ellipsizeMode: 'tail',
+                      }}
+                      dropDownContainerStyle={{
+                        borderRadius: 12,
+                        maxHeight: 200,
+                      }}
+                      listItemContainerStyle={{
+                        height: 45,
+                      }}
+                      listItemLabelStyle={{
+                        fontSize: 16,
+                        color: '#222',
+                        overflow: 'hidden',
+                      }}
+                    />
+                  </View>
+                  <View style={[styles.dropDownContainer, {width: '48%'}]}>
+                    <DropDownPicker
+                      open={ucFilterOpen}
+                      value={ucFilterValue}
+                      items={transformedUC}
+                      setOpen={setUCFilterOpen}
+                      setValue={setUCFilterValue}
+                      placeholder="Donations By UC"
+                      placeholderStyle={{
+                        color: '#888',
+                        fontSize: 16,
+                      }}
+                      ArrowUpIconComponent={() => (
+                        <Icon name="chevron-up" size={25} color="#6E11B0" />
+                      )}
+                      ArrowDownIconComponent={() => (
+                        <Icon name="chevron-down" size={25} color="#6E11B0" />
+                      )}
                       style={[
-                        styles.textInput,
+                        styles.dropDown,
                         {
-                          width: '48%',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          backgroundColor: 'rgba(245, 245, 245, 0.2)',
-                          marginTop: 8,
+                          zIndex: 999,
                         },
                       ]}
-                      onPress={() => setFromDateOpen(true)}
-                      activeOpacity={0.8}>
-                      <Text style={{color: '#222', fontSize: 16}}>
-                        {toDate ? toDate.toLocaleDateString() : 'To Date'}
+                      textStyle={{
+                        fontSize: 14,
+                        color: '#222',
+                      }}
+                      labelProps={{
+                        numberOfLines: 1,
+                        ellipsizeMode: 'tail',
+                      }}
+                      dropDownContainerStyle={{
+                        borderRadius: 12,
+                        maxHeight: 200,
+                      }}
+                      listItemContainerStyle={{
+                        height: 45,
+                      }}
+                      listItemLabelStyle={{
+                        fontSize: 16,
+                        color: '#222',
+                        overflow: 'hidden',
+                      }}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+          <Text style={[styles.sectionTitle, {paddingHorizontal: '5%'}]}>
+            All Users
+          </Text>
+          <View style={{flex: 1}}>
+            <ScrollView
+              style={styles.listContainer}
+              contentContainerStyle={{paddingBottom: 40}}>
+              {loading ? (
+                <LoadingSpinner />
+              ) : filteredDonations.length === 0 ? (
+                <Text style={styles.noDataText}>No Donation found</Text>
+              ) : (
+                filteredDonations.map(donor => (
+                  <View key={donor._id} style={styles.listItem}>
+                    <View style={styles.avatar}>
+                      <Icon name="charity" size={40} color="#6E11B0" />
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle}>
+                        {donor?.donor?.name ?? 'N/A'}
                       </Text>
-                      <Icon name="calendar" size={22} color="#6E11B0" />
-                      <DatePicker
-                        modal
-                        open={toDateOpen}
-                        mode="date"
-                        date={toDate}
-                        onConfirm={date => {
-                          setToDateOpen(false);
-                          setToDate(date);
-                        }}
-                        onCancel={() => {
-                          setToDateOpen(false);
-                        }}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.row}>
-                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
-                      <DropDownPicker
-                        open={open}
-                        value={value}
-                        items={items}
-                        setOpen={setOpen}
-                        setValue={setValue}
-                        setItems={setItems}
-                        placeholder="Select Type"
-                        placeholderStyle={{
-                          color: '#888',
-                          fontSize: 16,
-                        }}
-                        ArrowUpIconComponent={() => (
-                          <Icon name="chevron-up" size={25} color="#6E11B0" />
-                        )}
-                        ArrowDownIconComponent={() => (
-                          <Icon name="chevron-down" size={25} color="#6E11B0" />
-                        )}
-                        style={styles.dropDown}
-                        textStyle={{
-                          fontSize: 14,
-                          color: '#222',
-                        }}
-                        labelProps={{
-                          numberOfLines: 1,
-                          ellipsizeMode: 'tail',
-                        }}
-                        dropDownContainerStyle={{
-                          borderRadius: 12,
-                          maxHeight: 200,
-                          zIndex: 1000,
-                        }}
-                        listItemContainerStyle={{
-                          height: 45,
-                        }}
-                        listItemLabelStyle={{
-                          fontSize: 16,
-                          color: '#222',
-                          overflow: 'hidden',
-                        }}
-                      />
+                      <Text style={styles.itemSubtitle}>
+                        {formatDate(donor.date)}
+                      </Text>
+                      <Text style={styles.itemRole}>Rs. {donor.amount}</Text>
                     </View>
-                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
-                      <DropDownPicker
-                        open={distOpen}
-                        value={distValue}
-                        items={districtItems}
-                        setOpen={setDistOpen}
-                        setValue={setDistValue}
-                        setItems={setDistrictItems}
-                        placeholder="Select District"
-                        placeholderStyle={{
-                          color: '#888',
-                          fontSize: 16,
-                        }}
-                        ArrowUpIconComponent={() => (
-                          <Icon name="chevron-up" size={25} color="#6E11B0" />
-                        )}
-                        ArrowDownIconComponent={() => (
-                          <Icon name="chevron-down" size={25} color="#6E11B0" />
-                        )}
-                        style={styles.dropDown}
-                        textStyle={{
-                          fontSize: 14,
-                          color: '#222',
-                        }}
-                        labelProps={{
-                          numberOfLines: 1,
-                          ellipsizeMode: 'tail',
-                        }}
-                        dropDownContainerStyle={{
-                          borderRadius: 12,
-                          maxHeight: 200,
-                          zIndex: 1001,
-                        }}
-                        listItemContainerStyle={{
-                          height: 45,
-                        }}
-                        listItemLabelStyle={{
-                          fontSize: 16,
-                          color: '#222',
-                          overflow: 'hidden',
-                        }}
-                      />
+                    <View style={styles.itemActions}>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => {
+                          setModalVisible('View');
+                          setSelectedDon([donor]);
+                        }}>
+                        <Icon name="eye" size={20} color="#4ECDC4" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => navigation.navigate('UpdateDonation')}>
+                        <Icon name="pencil" size={20} color="#6E11B0" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => {
+                          setModalVisible('Delete');
+                          setSelectedDon([donor]);
+                        }}>
+                        <Icon name="delete" size={20} color="#FF6B6B" />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <View style={styles.row}>
-                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
-                      <DropDownPicker
-                        open={zoneOpen}
-                        value={zoneValue}
-                        items={zoneItems}
-                        setOpen={setZoneOpen}
-                        setValue={setZoneValue}
-                        setItems={setZoneItems}
-                        placeholder="Select Zone"
-                        placeholderStyle={{
-                          color: '#888',
-                          fontSize: 16,
-                        }}
-                        ArrowUpIconComponent={() => (
-                          <Icon name="chevron-up" size={25} color="#6E11B0" />
-                        )}
-                        ArrowDownIconComponent={() => (
-                          <Icon name="chevron-down" size={25} color="#6E11B0" />
-                        )}
-                        style={[
-                          styles.dropDown,
-                          {
-                            zIndex: 999,
-                          },
-                        ]}
-                        textStyle={{
-                          fontSize: 14,
-                          color: '#222',
-                        }}
-                        labelProps={{
-                          numberOfLines: 1,
-                          ellipsizeMode: 'tail',
-                        }}
-                        dropDownContainerStyle={{
-                          borderRadius: 12,
-                          maxHeight: 200,
-                        }}
-                        listItemContainerStyle={{
-                          height: 45,
-                        }}
-                        listItemLabelStyle={{
-                          fontSize: 16,
-                          color: '#222',
-                          overflow: 'hidden',
-                        }}
-                      />
-                    </View>
-                    <View style={[styles.dropDownContainer, {width: '48%'}]}>
-                      <DropDownPicker
-                        open={ucOpen}
-                        value={ucValue}
-                        items={ucItems}
-                        setOpen={setUCOpen}
-                        setValue={setUCValue}
-                        setItems={setUCItems}
-                        placeholder="Select UC"
-                        placeholderStyle={{
-                          color: '#888',
-                          fontSize: 16,
-                        }}
-                        ArrowUpIconComponent={() => (
-                          <Icon name="chevron-up" size={25} color="#6E11B0" />
-                        )}
-                        ArrowDownIconComponent={() => (
-                          <Icon name="chevron-down" size={25} color="#6E11B0" />
-                        )}
-                        style={[
-                          styles.dropDown,
-                          {
-                            zIndex: 999,
-                          },
-                        ]}
-                        textStyle={{
-                          fontSize: 14,
-                          color: '#222',
-                        }}
-                        labelProps={{
-                          numberOfLines: 1,
-                          ellipsizeMode: 'tail',
-                        }}
-                        dropDownContainerStyle={{
-                          borderRadius: 12,
-                          maxHeight: 200,
-                        }}
-                        listItemContainerStyle={{
-                          height: 45,
-                        }}
-                        listItemLabelStyle={{
-                          fontSize: 16,
-                          color: '#222',
-                          overflow: 'hidden',
-                        }}
-                      />
-                    </View>
-                  </View>
-                </>
+                ))
               )}
-            </View>
-            <Text style={styles.sectionTitle}>All Users</Text>
-            {donationsData.map(donor => (
-              <View key={donor.id} style={styles.listItem}>
-                <View style={styles.avatar}>
-                  <Icon name="charity" size={40} color="#6E11B0" />
-                </View>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>{donor.donor}</Text>
-                  <Text style={styles.itemSubtitle}>{donor.date}</Text>
-                  <Text style={styles.itemRole}>Rs. {donor.amount}</Text>
-                </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setModalVisible('View')}>
-                    <Icon name="eye" size={20} color="#4ECDC4" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => navigation.navigate('UpdateDonation')}>
-                    <Icon name="pencil" size={20} color="#6E11B0" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => setModalVisible('Delete')}>
-                    <Icon name="delete" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        </ScrollView>
+            </ScrollView>
+          </View>
+        </View>
       )}
 
-      <View
-        style={{
-          flex: 1,
-          padding: 20,
-        }}>
-        {selectedTab === 'Receive Donations' && (
-          <>
-            <Text style={styles.sectionTitle}>Receive Donations</Text>
+      {selectedTab === 'Receive Donations' && (
+        <View
+          style={{
+            padding: 20,
+          }}>
+          <Text style={styles.sectionTitle}>Receive Donations</Text>
 
-            <View style={styles.receiveDonContainer}>
-              <View>
-                <Text
-                  style={{
-                    fontWeight: '600',
-                    fontSize: 16,
-                    marginBottom: 6,
-                    color: '#6E11B0',
-                  }}>
-                  Search Donor
-                </Text>
-                <View style={styles.searchContainer}>
-                  <TextInput
-                    placeholder="Contact | Name"
-                    placeholderTextColor="#888"
-                    style={styles.textInput}
-                  />
-                  <TouchableOpacity style={styles.searchBtn}>
-                    <Text style={styles.searchBtnText}>Search</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Text>
-                      <Icon name="plus" size={40} color={'#6E11B0'} />
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Inputs */}
-              <View style={styles.inputContainer}>
+          <View style={styles.receiveDonContainer}>
+            <View>
+              <Text
+                style={{
+                  fontWeight: '600',
+                  fontSize: 16,
+                  marginBottom: 6,
+                  color: '#6E11B0',
+                }}>
+                Search Donor
+              </Text>
+              <View style={styles.searchContainer}>
                 <TextInput
-                  placeholder="Name"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
+                  placeholder="Contact | Name"
+                  placeholderTextColor="#888"
+                  style={styles.textInput}
                 />
-                <TextInput
-                  placeholder="Contact"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Address"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
-                />
-                <TextInput
-                  placeholder="District"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Zone"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
-                />
-                <TextInput
-                  placeholder="Union Concil"
-                  placeholderTextColor="#666"
-                  editable={false}
-                  style={[
-                    styles.textInput,
-                    {width: '48%', backgroundColor: '#D1D5DC'},
-                  ]}
-                />
-              </View>
-
-              {/* Inside Receive Donations tab */}
-              <View style={styles.inputContainer}>
-                <View style={styles.dropDownContainer}>
-                  <DropDownPicker
-                    open={open}
-                    value={value}
-                    items={items}
-                    setOpen={setOpen}
-                    setValue={setValue}
-                    setItems={setItems}
-                    placeholder="Select Type"
-                    placeholderStyle={{
-                      color: '#888',
-                      fontSize: 16,
-                    }}
-                    ArrowUpIconComponent={() => (
-                      <Icon name="chevron-up" size={25} color="#6E11B0" />
-                    )}
-                    ArrowDownIconComponent={() => (
-                      <Icon name="chevron-down" size={25} color="#6E11B0" />
-                    )}
-                    style={styles.dropDown}
-                    textStyle={{
-                      fontSize: 14,
-                      color: '#222',
-                    }}
-                    labelProps={{
-                      numberOfLines: 1,
-                      ellipsizeMode: 'tail',
-                    }}
-                    dropDownContainerStyle={{
-                      borderRadius: 12,
-                      maxHeight: 200,
-                    }}
-                    listItemContainerStyle={{
-                      height: 45,
-                    }}
-                    listItemLabelStyle={{
-                      fontSize: 16,
-                      color: '#222',
-                      overflow: 'hidden',
-                    }}
-                  />
-                </View>
-
-                <TouchableOpacity>
-                  <Icon name="plus" size={35} color={'#6E11B0'} />
+                <TouchableOpacity style={styles.searchBtn}>
+                  <Text style={styles.searchBtnText}>Search</Text>
                 </TouchableOpacity>
-
-                <TextInput
-                  placeholder="Amount"
-                  placeholderTextColor="#666"
-                  keyboardType="number-pad"
-                  style={[styles.textInput, {width: '48%'}]}
-                />
+                <TouchableOpacity>
+                  <Text>
+                    <Icon name="plus" size={40} color={'#6E11B0'} />
+                  </Text>
+                </TouchableOpacity>
               </View>
+            </View>
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder="Cash | Bank | Jazzcash etc"
-                  placeholderTextColor="#666"
-                  style={[styles.textInput, {width: '100%'}]}
-                />
-              </View>
-
-              <TouchableOpacity
+            {/* Inputs */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                placeholder="Name"
+                placeholderTextColor="#666"
+                editable={false}
                 style={[
                   styles.textInput,
-                  {
-                    width: '100%',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor: 'rgba(245, 245, 245, 0.2)',
-                    marginTop: 8,
-                  },
+                  {width: '48%', backgroundColor: '#D1D5DC'},
                 ]}
-                onPress={() => setDateOpen(true)}
-                activeOpacity={0.8}>
-                <Text style={{color: '#222', fontSize: 16}}>
-                  {date ? date.toLocaleDateString() : 'Select Date'}
-                </Text>
-                <Icon name="calendar" size={22} color="#6E11B0" />
-                <DatePicker
-                  modal
-                  open={dateOpen}
-                  mode="date"
-                  date={date}
-                  onConfirm={date => {
-                    setDateOpen(false);
-                    setDate(date);
+              />
+              <TextInput
+                placeholder="Contact"
+                placeholderTextColor="#666"
+                editable={false}
+                style={[
+                  styles.textInput,
+                  {width: '48%', backgroundColor: '#D1D5DC'},
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                placeholder="Address"
+                placeholderTextColor="#666"
+                editable={false}
+                style={[
+                  styles.textInput,
+                  {width: '48%', backgroundColor: '#D1D5DC'},
+                ]}
+              />
+              <TextInput
+                placeholder="District"
+                placeholderTextColor="#666"
+                editable={false}
+                style={[
+                  styles.textInput,
+                  {width: '48%', backgroundColor: '#D1D5DC'},
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                placeholder="Zone"
+                placeholderTextColor="#666"
+                editable={false}
+                style={[
+                  styles.textInput,
+                  {width: '48%', backgroundColor: '#D1D5DC'},
+                ]}
+              />
+              <TextInput
+                placeholder="Union Concil"
+                placeholderTextColor="#666"
+                editable={false}
+                style={[
+                  styles.textInput,
+                  {width: '48%', backgroundColor: '#D1D5DC'},
+                ]}
+              />
+            </View>
+
+            {/* Inside Receive Donations tab */}
+            <View style={styles.inputContainer}>
+              <View style={styles.dropDownContainer}>
+                <DropDownPicker
+                  open={open}
+                  value={value}
+                  items={items}
+                  setOpen={setOpen}
+                  setValue={setValue}
+                  setItems={setItems}
+                  placeholder="Select Type"
+                  placeholderStyle={{
+                    color: '#888',
+                    fontSize: 16,
                   }}
-                  onCancel={() => {
-                    setDateOpen(false);
+                  ArrowUpIconComponent={() => (
+                    <Icon name="chevron-up" size={25} color="#6E11B0" />
+                  )}
+                  ArrowDownIconComponent={() => (
+                    <Icon name="chevron-down" size={25} color="#6E11B0" />
+                  )}
+                  style={styles.dropDown}
+                  textStyle={{
+                    fontSize: 14,
+                    color: '#222',
+                  }}
+                  labelProps={{
+                    numberOfLines: 1,
+                    ellipsizeMode: 'tail',
+                  }}
+                  dropDownContainerStyle={{
+                    borderRadius: 12,
+                    maxHeight: 200,
+                  }}
+                  listItemContainerStyle={{
+                    height: 45,
+                  }}
+                  listItemLabelStyle={{
+                    fontSize: 16,
+                    color: '#222',
+                    overflow: 'hidden',
                   }}
                 />
+              </View>
+
+              <TouchableOpacity>
+                <Icon name="plus" size={35} color={'#6E11B0'} />
               </TouchableOpacity>
 
               <TextInput
-                placeholder="Remarks"
+                placeholder="Amount"
                 placeholderTextColor="#666"
-                multiline
-                numberOfLines={4}
-                style={[
-                  styles.textInput,
-                  {
-                    width: '100%',
-                    height: 90,
-                    textAlignVertical: 'top',
-                    marginTop: 8,
-                  },
-                ]}
+                keyboardType="number-pad"
+                style={[styles.textInput, {width: '48%'}]}
               />
-
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#6E11B0',
-                  borderRadius: 10,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                  marginTop: 15,
-                }}
-                onPress={() => {
-                  // Submit donation logic here
-                }}>
-                <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 16}}>
-                  Submit Donation
-                </Text>
-              </TouchableOpacity>
             </View>
-          </>
-        )}
-      </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                placeholder="Cash | Bank | Jazzcash etc"
+                placeholderTextColor="#666"
+                style={[styles.textInput, {width: '100%'}]}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.textInput,
+                {
+                  width: '100%',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: 'rgba(245, 245, 245, 0.2)',
+                  marginTop: 8,
+                },
+              ]}
+              onPress={() => setDateOpen(true)}
+              activeOpacity={0.8}>
+              <Text style={{color: '#222', fontSize: 16}}>
+                {date ? date.toLocaleDateString() : 'Select Date'}
+              </Text>
+              <Icon name="calendar" size={22} color="#6E11B0" />
+              <DatePicker
+                modal
+                open={dateOpen}
+                mode="date"
+                date={date}
+                onConfirm={date => {
+                  setDateOpen(false);
+                  setDate(date);
+                }}
+                onCancel={() => {
+                  setDateOpen(false);
+                }}
+              />
+            </TouchableOpacity>
+
+            <TextInput
+              placeholder="Remarks"
+              placeholderTextColor="#666"
+              multiline
+              numberOfLines={4}
+              style={[
+                styles.textInput,
+                {
+                  width: '100%',
+                  height: 90,
+                  textAlignVertical: 'top',
+                  marginTop: 8,
+                },
+              ]}
+            />
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 10,
+                paddingVertical: 12,
+                alignItems: 'center',
+                marginTop: 15,
+              }}
+              onPress={() => {
+                // Submit donation logic here
+              }}>
+              <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 16}}>
+                Submit Donation
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* View Modal */}
       <Modal
@@ -730,6 +906,7 @@ const Donations = ({navigation}: any) => {
         animationType="fade"
         onRequestClose={() => {
           setModalVisible('');
+          setSelectedDon([]);
         }}>
         <View
           style={{
@@ -758,6 +935,7 @@ const Donations = ({navigation}: any) => {
               }}
               onPress={() => {
                 setModalVisible('');
+                setSelectedDon([]);
               }}>
               <Icon name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -782,53 +960,77 @@ const Donations = ({navigation}: any) => {
                       fontWeight: '300',
                       textDecorationLine: 'underline',
                     }}>
-                    DON-0030
+                    {selectedDon[0]?.receiptNumber ?? 'N/A'}
                   </Text>
                 </Text>
               </View>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Name:</Text>
-              <Text style={styles.modalSimpText}>Muhammad Awais</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.donor?.name ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Contact:</Text>
-              <Text style={styles.modalSimpText}>03001122335</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.donor?.contact ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Address:</Text>
-              <Text style={styles.modalSimpText}>Hafizabad Road</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.donor?.address ?? 'N/a'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Donation Type: </Text>
-              <Text style={styles.modalSimpText}>Donation type 1</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.donationType?.dontype ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>District: </Text>
-              <Text style={styles.modalSimpText}>N/A</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.districtId?.district ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Zone/ Tehsil: </Text>
-              <Text style={styles.modalSimpText}>N/A</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.zoneId?.zname ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Union Council: </Text>
-              <Text style={styles.modalSimpText}>New UC</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.ucId?.uname ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Remarks: </Text>
-              <Text style={styles.modalSimpText}>None</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.remarks ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Payment Mode: </Text>
-              <Text style={styles.modalSimpText}>..........</Text>
+              <Text style={styles.modalSimpText}>
+                {selectedDon[0]?.paymentMode ?? 'N/A'}
+              </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>
-                Amount: <Text style={styles.modalSimpText}>Rs. 5000/-</Text>
+                Amount:{' '}
+                <Text style={styles.modalSimpText}>
+                  Rs. {selectedDon[0]?.amount ?? 'N/A'}/-
+                </Text>
               </Text>
               <Text style={styles.modalBoldText}>
-                Date: <Text style={styles.modalSimpText}>6/5/2025</Text>
+                Date:{' '}
+                <Text style={styles.modalSimpText}>
+                  {formatDate(selectedDon[0]?.date ?? 'N/A')}
+                </Text>
               </Text>
             </View>
             <View
@@ -838,7 +1040,11 @@ const Donations = ({navigation}: any) => {
               ]}>
               <Text style={styles.modalBoldText}>Amount In Words: </Text>
               <Text style={styles.modalSimpText}>
-                Five Thousand Rupees Only
+                {selectedDon[0]?.amount
+                  ? `${numberToWords(
+                      parseInt(selectedDon[0]?.amount, 10),
+                    )} Rupees Only`
+                  : 'Zero Rupees Only'}
               </Text>
             </View>
             <View style={styles.separator} />
@@ -875,7 +1081,10 @@ const Donations = ({navigation}: any) => {
         transparent
         visible={modalVisible === 'Delete'}
         animationType="fade"
-        onRequestClose={() => setModalVisible('')}>
+        onRequestClose={() => {
+          setModalVisible('');
+          setSelectedDon([]);
+        }}>
         <View
           style={{
             flex: 1,
@@ -921,9 +1130,7 @@ const Donations = ({navigation}: any) => {
                 marginBottom: 28,
                 textAlign: 'center',
               }}>
-              This {selectedTab === 'Roles' && 'Role'}
-              {selectedTab === 'System Users' && 'User'}
-              {selectedTab === 'Donors' && 'Donor'} be permanently deleted.
+              This donation will be permanently deleted.
             </Text>
             {/* Buttons */}
             <View
@@ -942,8 +1149,7 @@ const Donations = ({navigation}: any) => {
                   marginRight: 8,
                 }}
                 onPress={() => {
-                  // handle delete logic here
-                  setModalVisible('');
+                  deleteDonation();
                 }}>
                 <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
                   Yes, delete it
@@ -960,7 +1166,10 @@ const Donations = ({navigation}: any) => {
                   borderWidth: 1,
                   borderColor: '#E0E0E0',
                 }}
-                onPress={() => setModalVisible('')}>
+                onPress={() => {
+                  setModalVisible('');
+                  setSelectedDon([]);
+                }}>
                 <Text
                   style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
                   Cancel
@@ -1031,13 +1240,14 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   contentContainer: {
+    flex: 1,
     padding: 20,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#6E11B0',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   listItem: {
     backgroundColor: '#FFFFFF',
@@ -1059,7 +1269,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#333',
   },
@@ -1227,5 +1437,49 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#6E11B0',
+  },
+  listContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  //Loading Component
+  loadingContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingSquare: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+  },
+  dashedCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 7,
+    borderColor: '#6E11B0',
+    ...Platform.select({
+      ios: {
+        borderStyle: 'dashed',
+      },
+      android: {
+        borderStyle: 'dotted',
+      },
+    }),
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#8E8E93',
+    fontSize: 16,
+    marginTop: 20,
   },
 });
