@@ -70,17 +70,57 @@ interface DonTypes {
   dontype: string;
 }
 
+interface Donors {
+  _id: string;
+  name: string;
+  contact: string;
+  address: string;
+  ucId: {
+    _id: string;
+    uname: string;
+  };
+  districtId: {
+    _id: string;
+    district: string;
+  };
+  zoneId: {
+    _id: string;
+    zname: string;
+  };
+}
+
+interface ReceiveDonation {
+  amount: string;
+  paymentMode: string;
+  date: Date;
+  remarks: string;
+}
+
+const initialDonationForm: ReceiveDonation = {
+  amount: '',
+  date: new Date(),
+  paymentMode: '',
+  remarks: '',
+};
+
+interface AddDonor {
+  name: string;
+  contact: string;
+  address: string;
+}
+
+const initialAddDonorForm: AddDonor = {
+  address: '',
+  contact: '',
+  name: '',
+};
+
 const Donations = ({navigation}: any) => {
   const [selectedTab, setSelectedTab] = useState('All Donations');
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
-  const [date, setDate] = useState(new Date());
   const [dateOpen, setDateOpen] = useState(false);
   const [modalVisible, setModalVisible] = useState('');
-  const [fromDate, setFromDate] = useState(new Date());
-  const [toDate, setToDate] = useState(new Date());
-  const [fromDateOpen, setFromDateOpen] = useState(false);
-  const [toDateOpen, setToDateOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [selectedDon, setSelectedDon] = useState<Donation[]>([]);
@@ -96,7 +136,21 @@ const Donations = ({navigation}: any) => {
     null,
   );
   const [loading, setLoading] = useState(false);
-  const [searchReceipt, setSearchReceipt] = useState('');
+  const [searchDonors, setSearchDonors] = useState('');
+  const [donors, setDonors] = useState<[]>([]);
+  const [donForm, setDonForm] = useState<ReceiveDonation>(initialDonationForm);
+  const [addDonorForm, setAddDonorForm] =
+    useState<AddDonor>(initialAddDonorForm);
+  const [ucValue, setUCValue] = useState<string | null>(null);
+  const [distValue, setDistValue] = useState<string | null>(null);
+  const [zoneValue, setZoneValue] = useState<string | null>(null);
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [ucOpen, setUCOpen] = useState(false);
+  const [distOpen, setDistOpen] = useState(false);
+  const [dist, setDist] = useState('');
+  const [uc, setUc] = useState('');
+  const [zone, setZone] = useState('');
+  const [donorAddModal, setDonorAddModal] = useState('');
 
   // District Dropdown
   const [districts, setDistricts] = useState<Districts[]>([]);
@@ -104,6 +158,23 @@ const Donations = ({navigation}: any) => {
     label: dist.district,
     value: dist._id,
   }));
+
+  const donorOnChange = async (field: keyof AddDonor, value: string) => {
+    setAddDonorForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const donFormOnChange = (
+    field: keyof ReceiveDonation,
+    value: string | Date,
+  ) => {
+    setDonForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   //Get Districts
   const getAllDist = async () => {
@@ -204,7 +275,322 @@ const Donations = ({navigation}: any) => {
     }
   };
 
+  // Get Donors
+  const getDonors = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/Donor/getDonors`);
+      setDonors(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Add Donor
+  const addDonor = async () => {
+    if (
+      !addDonorForm.name.trim() ||
+      !addDonorForm.contact.trim() ||
+      !addDonorForm.address.trim() ||
+      !distValue ||
+      !zoneValue ||
+      !ucValue
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill all fields and select District, Zone, and UC.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axios.post(`${BASE_URL}/Donor/addDonor`, {
+        name: addDonorForm.name.trim(),
+        contact: addDonorForm.contact.trim(),
+        address: addDonorForm.address.trim(),
+        districtId: distValue,
+        zoneId: zoneValue,
+        ucId: ucValue,
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donor added successfully!',
+          visibilityTime: 1500,
+        });
+        setAddDonorForm(initialAddDonorForm);
+        setDistValue(null);
+        setZoneValue(null);
+        setUCValue(null);
+        setModalVisible('');
+        getDonors();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.data?.message || 'Failed to add donor.',
+          visibilityTime: 1500,
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to add donor.',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add District
+  const addDist = async () => {
+    if (!dist.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a district name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = districts.some(
+        d => d.district.trim().toLowerCase() === dist.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate District',
+          text2: 'A district with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/District/addDist`, {
+        district: dist.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'District added successfully!',
+          visibilityTime: 1500,
+        });
+        setDist('');
+        setDonorAddModal('');
+        getAllDist();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add UC
+  const addUC = async () => {
+    if (!uc.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a UC name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = ucItems.some(
+        d => d.uname.trim().toLowerCase() === uc.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate UC',
+          text2: 'A UC with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/UC/addUC`, {
+        uname: uc.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'UC added successfully!',
+          visibilityTime: 1500,
+        });
+        setUc('');
+        setDonorAddModal('');
+        getAllUC();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add Zone
+  const addZone = async () => {
+    if (!zone.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Zone name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Check if district already exists (case-insensitive)
+      const exists = zoneItems.some(
+        d => d.zname.trim().toLowerCase() === zone.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate Zone',
+          text2: 'A Zone with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/Zone/addZone`, {
+        zname: zone.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Zone added successfully!',
+          visibilityTime: 1500,
+        });
+        setZone('');
+        setDonorAddModal('');
+        getAllZone();
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rceive Donation
+  const receiveDonation = async () => {
+    if (!selectedDonor[0]?._id) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a donor.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!value) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a donation type.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (
+      !donForm.amount ||
+      isNaN(Number(donForm.amount)) ||
+      Number(donForm.amount) <= 0
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a valid amount.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!donForm.paymentMode || donForm.paymentMode.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a payment mode.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!donForm.date) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a date.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const res = await axios.post(`${BASE_URL}/Donation/receiveDonation`, {
+        address: selectedDonor[0]?.address,
+        amount: donForm.amount,
+        contact: selectedDonor[0]?.contact,
+        date: donForm.date,
+        donationType: value,
+        donorId: selectedDonor[0]?._id,
+        name: selectedDonor[0]?.name,
+        paymentMode: donForm.paymentMode,
+        remarks: donForm.remarks,
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation received successfully!',
+          visibilityTime: 1500,
+        });
+        getReceivedDonations();
+        setSelectedDonor([]);
+        setDonForm(initialDonationForm);
+        setSearchDonor('');
+      }
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to receive donation.',
+        visibilityTime: 1500,
+      });
+      console.log(err);
+    }
+  };
+
   useEffect(() => {
+    getDonors();
     getReceivedDonations();
     getAllDist();
     getAllDonType();
@@ -349,6 +735,12 @@ const Donations = ({navigation}: any) => {
       matchesName && matchesType && matchesDist && matchesZone && matchesUC
     );
   });
+
+  // State for donor search dropdown visibility
+  const [showDonorSearch, setShowDonorSearch] = useState(false);
+
+  // State for selected donor in "Receive Donations"
+  const [selectedDonor, setSelectedDonor] = useState<Donors[]>([]);
 
   return (
     <View style={styles.container}>
@@ -647,7 +1039,11 @@ const Donations = ({navigation}: any) => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.actionButton}
-                        onPress={() => navigation.navigate('UpdateDonation')}>
+                        onPress={() =>
+                          navigation.navigate('UpdateDonation', {
+                            donationData: donor,
+                          })
+                        }>
                         <Icon name="pencil" size={20} color="#6E11B0" />
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -690,16 +1086,102 @@ const Donations = ({navigation}: any) => {
                   placeholder="Contact | Name"
                   placeholderTextColor="#888"
                   style={styles.textInput}
+                  value={searchDonors}
+                  onChangeText={text => {
+                    setSearchDonors(text);
+                    setShowDonorSearch(true);
+                    if (text === '') {
+                      setSelectedDonor([]);
+                    }
+                  }}
+                  onFocus={() => setShowDonorSearch(true)}
+                  onBlur={() =>
+                    setTimeout(() => setShowDonorSearch(false), 200)
+                  }
                 />
                 <TouchableOpacity style={styles.searchBtn}>
                   <Text style={styles.searchBtnText}>Search</Text>
                 </TouchableOpacity>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => setModalVisible('Donor')}>
                   <Text>
                     <Icon name="plus" size={40} color={'#6E11B0'} />
                   </Text>
                 </TouchableOpacity>
               </View>
+              {/* Donor Search Modal-like Dropdown */}
+              {showDonorSearch && searchDonors.length > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 75,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#fff',
+                    borderRadius: 10,
+                    elevation: 8,
+                    zIndex: 9999,
+                    maxHeight: 200,
+                    borderWidth: 1,
+                    borderColor: '#E0E0E0',
+                  }}>
+                  <ScrollView keyboardShouldPersistTaps="handled">
+                    {donors
+                      .filter(
+                        (d: Donors) =>
+                          d.name
+                            .toLowerCase()
+                            .includes(searchDonors.toLowerCase()) ||
+                          d.contact
+                            .toLowerCase()
+                            .includes(searchDonors.toLowerCase()),
+                      )
+                      .map((d: Donors) => (
+                        <TouchableOpacity
+                          key={d._id}
+                          style={{
+                            padding: 12,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#F0F0F0',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                          }}
+                          onPress={() => {
+                            setSearchDonors(d.name);
+                            setSelectedDonor([d]);
+                            setShowDonorSearch(false);
+                          }}>
+                          <Icon name="account" size={22} color="#6E11B0" />
+                          <View style={{marginLeft: 10}}>
+                            <Text style={{fontWeight: '600', color: '#222'}}>
+                              {d.name}
+                            </Text>
+                            <Text style={{color: '#888', fontSize: 13}}>
+                              {d.contact}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    {donors.filter(
+                      (d: Donors) =>
+                        d.name
+                          .toLowerCase()
+                          .includes(searchDonors.toLowerCase()) ||
+                        d.contact
+                          .toLowerCase()
+                          .includes(searchDonors.toLowerCase()),
+                    ).length === 0 && (
+                      <Text
+                        style={{
+                          padding: 12,
+                          color: '#888',
+                          textAlign: 'center',
+                        }}>
+                        No donor found
+                      </Text>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
             {/* Inputs */}
@@ -708,6 +1190,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="Name"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.name || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -717,6 +1200,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="Contact"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.contact || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -729,6 +1213,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="Address"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.address || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -738,6 +1223,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="District"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.districtId?.district || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -750,6 +1236,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="Zone"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.zoneId?.zname || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -759,6 +1246,7 @@ const Donations = ({navigation}: any) => {
                 placeholder="Union Concil"
                 placeholderTextColor="#666"
                 editable={false}
+                value={selectedDonor[0]?.ucId?.uname || ''}
                 style={[
                   styles.textInput,
                   {width: '48%', backgroundColor: '#D1D5DC'},
@@ -804,7 +1292,7 @@ const Donations = ({navigation}: any) => {
                     height: 45,
                   }}
                   listItemLabelStyle={{
-                    fontSize: 16,
+                    fontSize: 14,
                     color: '#222',
                     overflow: 'hidden',
                   }}
@@ -819,6 +1307,8 @@ const Donations = ({navigation}: any) => {
                 placeholder="Amount"
                 placeholderTextColor="#666"
                 keyboardType="number-pad"
+                value={donForm.amount}
+                onChangeText={t => donFormOnChange('amount', t)}
                 style={[styles.textInput, {width: '48%'}]}
               />
             </View>
@@ -827,6 +1317,8 @@ const Donations = ({navigation}: any) => {
               <TextInput
                 placeholder="Cash | Bank | Jazzcash etc"
                 placeholderTextColor="#666"
+                value={donForm.paymentMode}
+                onChangeText={t => donFormOnChange('paymentMode', t)}
                 style={[styles.textInput, {width: '100%'}]}
               />
             </View>
@@ -846,17 +1338,19 @@ const Donations = ({navigation}: any) => {
               onPress={() => setDateOpen(true)}
               activeOpacity={0.8}>
               <Text style={{color: '#222', fontSize: 16}}>
-                {date ? date.toLocaleDateString() : 'Select Date'}
+                {donForm.date
+                  ? donForm.date.toLocaleDateString()
+                  : 'Select Date'}
               </Text>
               <Icon name="calendar" size={22} color="#6E11B0" />
               <DatePicker
                 modal
                 open={dateOpen}
                 mode="date"
-                date={date}
+                date={donForm.date}
                 onConfirm={date => {
                   setDateOpen(false);
-                  setDate(date);
+                  donFormOnChange('date', date);
                 }}
                 onCancel={() => {
                   setDateOpen(false);
@@ -869,6 +1363,8 @@ const Donations = ({navigation}: any) => {
               placeholderTextColor="#666"
               multiline
               numberOfLines={4}
+              value={donForm.remarks}
+              onChangeText={t => donFormOnChange('remarks', t)}
               style={[
                 styles.textInput,
                 {
@@ -889,7 +1385,7 @@ const Donations = ({navigation}: any) => {
                 marginTop: 15,
               }}
               onPress={() => {
-                // Submit donation logic here
+                receiveDonation();
               }}>
               <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 16}}>
                 Submit Donation
@@ -1176,6 +1672,583 @@ const Donations = ({navigation}: any) => {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Donor */}
+      <Modal
+        transparent
+        visible={modalVisible === 'Donor'}
+        animationType="fade"
+        onRequestClose={() => {
+          setModalVisible('');
+          setDistValue(null);
+          setUCValue(null);
+          setZoneValue(null);
+          setAddDonorForm(initialAddDonorForm);
+        }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => {
+                setModalVisible('');
+                setAddDonorForm(initialAddDonorForm);
+                setDistValue(null);
+                setUCValue(null);
+                setZoneValue(null);
+              }}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add New Donor
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter Name'}
+                value={addDonorForm.name}
+                onChangeText={t => donorOnChange('name', t)}
+                placeholderTextColor={'#888'}
+                style={[
+                  styles.textInput,
+                  {
+                    width: '100%',
+                    marginBottom: 15,
+                  },
+                ]}
+              />
+              <TextInput
+                placeholder={'Enter Contact'}
+                value={addDonorForm.contact}
+                onChangeText={t => donorOnChange('contact', t)}
+                placeholderTextColor={'#888'}
+                style={[
+                  styles.textInput,
+                  {
+                    width: '100%',
+                    marginBottom: 15,
+                  },
+                ]}
+                keyboardType="number-pad"
+              />
+              <TextInput
+                placeholder={'Enter Address'}
+                value={addDonorForm.address}
+                onChangeText={t => donorOnChange('address', t)}
+                placeholderTextColor={'#888'}
+                style={[
+                  styles.textInput,
+                  {
+                    height: 100,
+                    textAlignVertical: 'top',
+                    marginBottom: 15,
+                    width: '100%',
+                  },
+                ]}
+                multiline
+                numberOfLines={4}
+              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={distOpen}
+                    value={distValue}
+                    items={transformedDist}
+                    setOpen={setDistOpen}
+                    setValue={setDistValue}
+                    placeholder="Select District"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={styles.dropDown}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                      zIndex: 1001,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('District');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 15,
+                }}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={ucOpen}
+                    value={ucValue}
+                    items={transformedUC}
+                    setOpen={setUCOpen}
+                    setValue={setUCValue}
+                    placeholder="Select UC"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('UC');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View
+                  style={[styles.dropDownContainer, {flex: 1, marginRight: 8}]}>
+                  <DropDownPicker
+                    open={zoneOpen}
+                    value={zoneValue}
+                    items={transformedZone}
+                    setOpen={setZoneOpen}
+                    setValue={setZoneValue}
+                    setItems={setZoneItems}
+                    placeholder="Select Zone"
+                    placeholderStyle={{
+                      color: '#888',
+                      fontSize: 16,
+                    }}
+                    ArrowUpIconComponent={() => (
+                      <Icon name="chevron-up" size={25} color="#6E11B0" />
+                    )}
+                    ArrowDownIconComponent={() => (
+                      <Icon name="chevron-down" size={25} color="#6E11B0" />
+                    )}
+                    style={[
+                      styles.dropDown,
+                      {
+                        zIndex: 999,
+                      },
+                    ]}
+                    textStyle={{
+                      fontSize: 14,
+                      color: '#222',
+                    }}
+                    labelProps={{
+                      numberOfLines: 1,
+                      ellipsizeMode: 'tail',
+                    }}
+                    dropDownContainerStyle={{
+                      borderRadius: 12,
+                      maxHeight: 200,
+                    }}
+                    listItemContainerStyle={{
+                      height: 45,
+                    }}
+                    listItemLabelStyle={{
+                      fontSize: 16,
+                      color: '#222',
+                      overflow: 'hidden',
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#6E11B0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setDonorAddModal('Zone');
+                  }}>
+                  <Icon name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Buttons Row */}
+            <View
+              style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#6E11B0',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  addDonor();
+                }}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                  Add Donor
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F3F6FB',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                }}
+                onPress={() => {
+                  setModalVisible('');
+                  setAddDonorForm(initialAddDonorForm);
+                  setDistValue(null);
+                  setUCValue(null);
+                  setZoneValue(null);
+                }}>
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add District, Zone and UC Modal */}
+      <Modal
+        transparent
+        visible={donorAddModal === 'District'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add New District
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={dist}
+                onChangeText={setDist}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
+            </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addDist();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add District
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        transparent
+        visible={donorAddModal === 'UC'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add Union Council
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={uc}
+                onChangeText={setUc}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
+            </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addUC();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add Union Council
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        transparent
+        visible={donorAddModal === 'Zone'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add New Zone
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={zone}
+                onChangeText={setZone}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
+            </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addZone();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                Add Zone
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

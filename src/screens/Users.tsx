@@ -3168,8 +3168,8 @@ const Users = () => {
             <View style={{marginBottom: 40}}>
               <TextInput
                 placeholder={'Enter District Name'}
-                value={uc}
-                onChangeText={setUc}
+                value={zone}
+                onChangeText={setZone}
                 placeholderTextColor={'#888'}
                 style={{
                   borderWidth: 1,

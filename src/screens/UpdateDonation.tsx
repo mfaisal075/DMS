@@ -5,28 +5,59 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Image} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DatePicker from 'react-native-date-picker';
 import {ScrollView} from 'react-native';
+import {useRoute, RouteProp} from '@react-navigation/native';
+import axios from 'axios';
+import BASE_URL from '../components/BASE_URL';
+
+type UpdateDonationRouteParams = {
+  donationData: any;
+};
+
+interface DonTypes {
+  _id: string;
+  dontype: string;
+}
 
 const UpdateDonation = () => {
+  const route =
+    useRoute<RouteProp<{params: UpdateDonationRouteParams}, 'params'>>();
+  const {donationData} = route.params;
+
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [date, setDate] = useState(new Date());
   const [dateOpen, setDateOpen] = useState(false);
 
-  const [items, setItems] = useState([
-    {label: 'Donation type 1', value: 1},
-    {label: 'Donation type 22', value: 2},
-    {label: 'Donation type 3', value: 3},
-    {label: 'Education fund', value: 4},
-    {label: 'Donation type 5', value: 5},
-    {label: 'Health Fund', value: 6},
-    {label: 'New type', value: 7},
-  ]);
+  const [allDonType, setAllDonType] = useState<DonTypes[]>([]);
+  const transformedDonType = allDonType.map(type => ({
+    label: type.dontype,
+    value: type._id,
+  }));
+
+  // Get Donations Type
+  const getAllDonType = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/donType/getAllDonType`);
+      setAllDonType(res.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  useEffect(() => {
+    getAllDonType();
+    console.log(
+      'Date: ',
+      new Date(donationData.date).toISOString().slice(0, 10),
+    );
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Top Bar */}
@@ -58,41 +89,74 @@ const UpdateDonation = () => {
                 style={styles.textInput}
                 placeholder="Donor Name"
                 placeholderTextColor={'#666'}
+                value={donationData.donor.name}
+                onChangeText={t => {
+                  /* handle donor name change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Contact"
                 placeholderTextColor={'#666'}
+                value={donationData.donor.contact}
+                onChangeText={t => {
+                  /* handle contact change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Address"
                 placeholderTextColor={'#666'}
+                value={donationData.donor.address}
+                onChangeText={t => {
+                  /* handle address change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Union Council"
                 placeholderTextColor={'#666'}
+                value={donationData?.ucId?.uname}
+                onChangeText={t => {
+                  /* handle union council change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="District"
                 placeholderTextColor={'#666'}
+                value={donationData?.districtId?.district}
+                onChangeText={t => {
+                  /* handle district change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Zone"
                 placeholderTextColor={'#666'}
+                value={donationData?.zoneId?.zname}
+                onChangeText={t => {
+                  /* handle zone change */
+                }}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Account"
+                value={donationData.amount?.toString() || ''}
+                onChangeText={t => {
+                  /* handle amount change */
+                }}
                 placeholderTextColor={'#666'}
+                keyboardType="numeric"
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Payment Mode"
                 placeholderTextColor={'#666'}
+                value={donationData.paymentMode}
+                onChangeText={t => {
+                  /* handle payment mode change */
+                }}
               />
             </View>
 
@@ -100,11 +164,10 @@ const UpdateDonation = () => {
             <View style={styles.dropDownContainer}>
               <DropDownPicker
                 open={open}
-                value={value}
-                items={items}
+                value={donationData?.donationType._id}
+                items={transformedDonType}
                 setOpen={setOpen}
                 setValue={setValue}
-                setItems={setItems}
                 placeholder="Select Type"
                 placeholderStyle={{
                   color: '#888',
@@ -146,6 +209,7 @@ const UpdateDonation = () => {
                 style={styles.textInput}
                 placeholder="Remarks"
                 placeholderTextColor={'#666'}
+                value={donationData.remarks}
               />
             </View>
 
@@ -164,7 +228,11 @@ const UpdateDonation = () => {
               onPress={() => setDateOpen(true)}
               activeOpacity={0.8}>
               <Text style={{color: '#222', fontSize: 16}}>
-                {date ? date.toLocaleDateString() : 'Select Date'}
+                {date
+                  ? date.toLocaleDateString()
+                  : donationData?.date
+                  ? new Date(donationData.date).toLocaleDateString()
+                  : 'Select Date'}
               </Text>
               <Icon name="calendar" size={22} color="#6E11B0" />
               <DatePicker
