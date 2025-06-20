@@ -1,8 +1,10 @@
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +18,12 @@ import DatePicker from 'react-native-date-picker';
 import {ScrollView} from 'react-native';
 import axios from 'axios';
 import BASE_URL from '../components/BASE_URL';
+import {Modal} from 'react-native';
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
+import {PermissionsAndroid} from 'react-native';
+import {Alert} from 'react-native';
+import Toast from 'react-native-toast-message';
+import Sidebar from '../components/Sidebar';
 
 interface Districts {
   _id: string;
@@ -64,10 +72,27 @@ interface ReportsData {
   };
   remarks: string;
   date: string;
+  receiptNumber: string;
   paymentMode: string;
 }
 
-const Reports = () => {
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+const Reports = ({navigation}: any) => {
   const [open, setOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
@@ -80,9 +105,14 @@ const Reports = () => {
   const [toDate, setToDate] = useState(new Date());
   const [fromDateOpen, setFromDateOpen] = useState(false);
   const [toDateOpen, setToDateOpen] = useState(false);
-  const [searchName, setSearchName] = useState('');
   const [repData, setRepData] = useState<ReportsData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState('');
+  const [selectedRecord, setSelectedRecord] = useState<ReportsData[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearchTerm = useDebounce(searchInput, 500);
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
   // UC Dropdown
   const [ucItems, setUCItems] = useState<UC[]>([]);
@@ -162,17 +192,27 @@ const Reports = () => {
           .toISOString()
           .slice(0, 10)}&donationType=${
           value ?? ''
-        }&donorName=${encodeURIComponent(searchName)}&districtId=${
+        }&donorName=${encodeURIComponent(debouncedSearchTerm)}&districtId=${
           distValue ?? ''
         }&zoneId=${zoneValue ?? ''}&ucId=${ucValue ?? ''}`,
       );
       setRepData(res.data);
-      console.log('Data: ', res.data);
+      console.log(repData);
     } catch (error) {
       console.log(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setFromDate(new Date());
+    setToDate(new Date());
+    setValue(null);
+    setDistValue(null);
+    setZoneValue(null);
+    setUCValue(null);
   };
 
   useEffect(() => {
@@ -181,7 +221,28 @@ const Reports = () => {
     getAllZone();
     getAllDist();
     reportsData();
-  }, [fromDate, toDate, value, distValue, zoneValue, ucValue]);
+
+    // Handle Back Press
+    const handleBack = () => {
+      navigation.navigate('Dashboard');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+
+    return () => backHandler.remove();
+  }, [
+    fromDate,
+    toDate,
+    value,
+    distValue,
+    zoneValue,
+    ucValue,
+    debouncedSearchTerm,
+  ]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return ''; // Handle empty or invalid dates
@@ -224,20 +285,193 @@ const Reports = () => {
     );
   };
 
+  const generateDonationReportPDF = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Permission Denied',
+            'Cannot save PDF without storage permission.',
+          );
+          return;
+        }
+      }
+
+      const totalAmount = repData.reduce(
+        (sum, item) => sum + Number(item.amount),
+        0,
+      );
+      const now = new Date().toLocaleString();
+
+      // Create table rows
+      const tableRows = repData
+        .map((d, index) => {
+          return `
+            <tr>
+            <td style="min-width: 120px;">${d.receiptNumber}</td>
+            <td>${d.donor.name}</td>
+            <td>${d.donor.contact}</td>
+            <td>${d.donationType?.dontype}</td>
+            <td>${d.amount}</td>
+            <td>${formatDate(d.date)}</td>
+            <td>${d.donor?.districtId?.district}</td>
+            <td>${d.donor?.zoneId?.zname}</td>
+            <td>${d.donor?.ucId?.uname}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const htmlContent = `
+      <html>
+        <head>
+          <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h2, p { text-align: center; }
+        .table-container {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+        th, td {
+          border: 1px solid #ccc;
+          padding: 6px;
+          text-align: center;
+        }
+        th {
+          background-color: #f2f2f2;
+        }
+        .footer {
+          margin-top: 20px;
+          font-weight: bold;
+          text-align: center;
+        }
+          </style>
+        </head>
+        <body>
+          <h2>Donation Report</h2>
+          <p>Report Generated: ${now}</p>
+          <p>From: ${fromDate.toISOString().split('T')[0]} To: ${
+        toDate.toISOString().split('T')[0]
+      }</p>
+
+          <div class="table-container">
+        <table>
+          <tr>
+            <th>Receipt No.</th>
+            <th>Donor</th>
+            <th>Contact</th>
+            <th>Donation Type</th>
+            <th>Amount</th>
+            <th>Date</th>
+            <th>District</th>
+            <th>Zone</th>
+            <th>UC</th>
+          </tr>
+          ${tableRows}
+        </table>
+          </div>
+
+          <div class="footer">Total Donations (in PKR): ${totalAmount.toLocaleString()}</div>
+        </body>
+      </html>
+        `;
+
+      const pdfOptions = {
+        html: htmlContent,
+        fileName: 'Donation_Report',
+        directory: 'Documents',
+      };
+
+      const file = await RNHTMLtoPDF.convert(pdfOptions);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: `PDF Generated. Saved to: ${file.filePath}`,
+        visibilityTime: 1500,
+      });
+      return file.filePath;
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to generate PDF report.',
+        visibilityTime: 2000,
+      });
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
+        <TouchableOpacity onPress={() => setIsSidebarVisible(true)}>
+          <Icon name="menu" size={30} color="#fff" />
+        </TouchableOpacity>
         <Image
           source={require('../assets/logo-black.png')}
           style={{width: 100, height: 100}}
           tintColor={'#fff'}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Reports</Text>
-        <TouchableOpacity>
-          <Icon name="account-circle" size={45} color="#fff" />
-        </TouchableOpacity>
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity onPress={() => setShowSignOut(prev => !prev)}>
+            <Icon name="account-circle" size={45} color="#fff" />
+          </TouchableOpacity>
+          {showSignOut && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 50,
+                right: 0,
+                backgroundColor: '#fff',
+                borderRadius: 10,
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: {width: 0, height: 2},
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                paddingVertical: 8,
+                minWidth: 140,
+                alignItems: 'flex-start',
+                zIndex: 9999,
+              }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  width: '100%',
+                }}
+                onPress={() => {
+                  setShowSignOut(false);
+                  navigation.replace('Login');
+                }}>
+                <Icon
+                  name="logout"
+                  size={22}
+                  color="#6E11B0"
+                  style={{marginRight: 10}}
+                />
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '600', fontSize: 15}}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       <View
@@ -252,8 +486,8 @@ const Reports = () => {
             <TextInput
               style={styles.textInput}
               placeholder="Donor Name"
-              value={searchName}
-              onChangeText={t => setSearchName(t)}
+              value={searchInput}
+              onChangeText={setSearchInput}
               placeholderTextColor={'#666'}
             />
           </View>
@@ -272,7 +506,7 @@ const Reports = () => {
               ]}
               onPress={() => setFromDateOpen(true)}
               activeOpacity={0.8}>
-              <Text style={{color: '#222', fontSize: 16}}>
+              <Text style={{color: '#222', fontSize: 14}}>
                 {fromDate ? fromDate.toLocaleDateString() : 'From Date'}
               </Text>
               <Icon name="calendar" size={22} color="#6E11B0" />
@@ -302,9 +536,9 @@ const Reports = () => {
                   marginTop: 8,
                 },
               ]}
-              onPress={() => setFromDateOpen(true)}
+              onPress={() => setToDateOpen(true)}
               activeOpacity={0.8}>
-              <Text style={{color: '#222', fontSize: 16}}>
+              <Text style={{color: '#222', fontSize: 14}}>
                 {toDate ? toDate.toLocaleDateString() : 'To Date'}
               </Text>
               <Icon name="calendar" size={22} color="#6E11B0" />
@@ -334,7 +568,7 @@ const Reports = () => {
                 placeholder="Select Type"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -360,7 +594,7 @@ const Reports = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -376,7 +610,7 @@ const Reports = () => {
                 placeholder="Select District"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -402,7 +636,7 @@ const Reports = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -420,7 +654,7 @@ const Reports = () => {
                 placeholder="Select Zone"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -450,7 +684,7 @@ const Reports = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -466,7 +700,7 @@ const Reports = () => {
                 placeholder="Select UC"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -496,7 +730,7 @@ const Reports = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -504,10 +738,9 @@ const Reports = () => {
             </View>
           </View>
           <View style={styles.row}>
-            <TouchableOpacity style={styles.button}>
-              <Text style={styles.btnText}>Generate Report</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => clearFilters()}>
               <Text style={styles.btnText}>Clear Filter</Text>
             </TouchableOpacity>
           </View>
@@ -516,8 +749,12 @@ const Reports = () => {
           <View style={styles.separator} />
 
           <View style={styles.headingContainer}>
-            <Text style={[styles.heading, {color: '#6E11B0'}]}>Report</Text>
-            <TouchableOpacity style={styles.button}>
+            <Text style={[styles.sectionTitle, {color: '#6E11B0'}]}>
+              Report
+            </Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={generateDonationReportPDF}>
               <Text style={styles.btnText}>Download PDF</Text>
             </TouchableOpacity>
           </View>
@@ -549,7 +786,8 @@ const Reports = () => {
                     justifyContent: 'center',
                   }}
                   onPress={() => {
-                    // Handle card click (e.g., show details)
+                    setSelectedRecord([report]);
+                    setModalVisible('View');
                   }}>
                   <View
                     style={{
@@ -560,7 +798,7 @@ const Reports = () => {
                     <View style={{flex: 1, marginRight: 10}}>
                       <Text
                         style={{
-                          fontSize: 17,
+                          fontSize: 14,
                           fontWeight: '700',
                           color: '#6E11B0',
                           marginBottom: 2,
@@ -569,7 +807,7 @@ const Reports = () => {
                       </Text>
                       <Text
                         style={{
-                          fontSize: 13,
+                          fontSize: 12,
                           color: '#444',
                           fontWeight: '400',
                           marginBottom: 1,
@@ -578,7 +816,7 @@ const Reports = () => {
                       </Text>
                       <Text
                         style={{
-                          fontSize: 13,
+                          fontSize: 12,
                           color: '#888',
                           fontWeight: '400',
                         }}>
@@ -587,12 +825,12 @@ const Reports = () => {
                     </View>
                     <Text
                       style={{
-                        fontSize: 15,
+                        fontSize: 13,
                         color: '#6E11B0',
                         fontWeight: '700',
                         marginLeft: 8,
                       }}>
-                      {report.amount}
+                      Rs. {report.amount}/-
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -601,6 +839,119 @@ const Reports = () => {
           </ScrollView>
         </View>
       </View>
+
+      {/* View Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible === 'View'}
+        onRequestClose={() => {
+          setModalVisible('');
+          setSelectedRecord([]);
+        }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Donation Details</Text>
+              <Pressable
+                onPress={() => {
+                  setModalVisible('');
+                  setSelectedRecord([]);
+                }}
+                style={styles.closeButton}>
+                <Icon name="close" size={24} color="#000" />
+              </Pressable>
+            </View>
+
+            {/* Modal Body */}
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Receipt. No</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.receiptNumber || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Donor</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donor.name || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Contact</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donor.contact || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Donation Type</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donationType?.dontype || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Amount</Text>
+                <Text style={[styles.detailValue, styles.amountValue]}>
+                  Rs. {selectedRecord[0]?.amount || '0'}/-
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Date</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(selectedRecord[0]?.date) || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>District</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donor?.districtId?.district || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Zone</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donor?.zoneId?.zname || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>UC</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.donor?.ucId?.uname || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Payment Mode</Text>
+                <Text style={styles.detailValue}>
+                  {selectedRecord[0]?.paymentMode || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, {borderBottomWidth: 0}]}>
+                <Text style={styles.detailLabel}>Remarks</Text>
+                <Text style={[styles.detailValue, styles.remarks]}>
+                  {selectedRecord[0]?.remarks || 'No remarks'}
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sidebar Component */}
+      <Sidebar
+        isVisible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </View>
   );
 };
@@ -622,7 +973,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: '5%',
   },
   heading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -649,7 +1000,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: '#222',
     width: '100%',
     height: 45,
@@ -668,7 +1019,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#6E11B0',
     marginLeft: 15,
@@ -680,7 +1031,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   btnText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
     color: '#fff',
   },
@@ -733,5 +1084,84 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontSize: 16,
     marginTop: 20,
+  },
+
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomColor: '#6E11B0',
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6E11B0',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    width: '40%',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    width: '55%',
+    textAlign: 'right',
+  },
+  amountValue: {
+    fontWeight: 'bold',
+    color: '#6E11B0',
+  },
+  remarks: {
+    fontStyle: 'italic',
+    color: '#666',
+  },
+
+  // Report Card
+  reportCard: {
+    backgroundColor: '#F3F6FB',
+    borderRadius: 14,
+    marginHorizontal: 15,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#6E11B0',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+    minHeight: 60,
+    justifyContent: 'center',
   },
 });

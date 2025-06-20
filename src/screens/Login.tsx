@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import BASE_URL from '../components/BASE_URL';
 import Toast from 'react-native-toast-message';
+import {BackHandler} from 'react-native';
 
 interface LoginForm {
   email: string;
@@ -87,6 +88,21 @@ const Login = ({navigation}: any) => {
       console.log(error);
     }
   };
+
+  useEffect(() => {
+    const backAction = () => {
+      BackHandler.exitApp();
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction,
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container} edges={['right', 'left']}>
@@ -107,7 +123,7 @@ const Login = ({navigation}: any) => {
               <View>
                 <Text
                   style={{
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: 'bold',
                     color: '#222',
                     textAlign: 'center',
@@ -203,7 +219,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 14,
     marginBottom: 14,
     color: '#222',
   },

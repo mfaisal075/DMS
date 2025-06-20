@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useEffect, useState} from 'react';
+import React, {use, useEffect, useState} from 'react';
 import {Image} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -14,6 +14,8 @@ import {ScrollView} from 'react-native';
 import {useRoute, RouteProp} from '@react-navigation/native';
 import axios from 'axios';
 import BASE_URL from '../components/BASE_URL';
+import Toast from 'react-native-toast-message'; // Make sure to import Toast
+import {BackHandler} from 'react-native';
 
 type UpdateDonationRouteParams = {
   donationData: any;
@@ -24,15 +26,34 @@ interface DonTypes {
   dontype: string;
 }
 
-const UpdateDonation = () => {
+interface UpdateForm {
+  amount: string;
+  remarks: string;
+  paymentMode: string;
+  date: Date;
+}
+
+const UpdateDonation = ({navigation}: any) => {
   const route =
     useRoute<RouteProp<{params: UpdateDonationRouteParams}, 'params'>>();
   const {donationData} = route.params;
-
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(null);
-  const [date, setDate] = useState(new Date());
+  const [value, setValue] = useState(donationData?.donationType?._id || null);
   const [dateOpen, setDateOpen] = useState(false);
+  const [updateForm, setUpdateForm] = useState<UpdateForm>({
+    amount: donationData.amount.toString(),
+    date: new Date(donationData.date),
+    paymentMode: donationData.paymentMode,
+    remarks: donationData.remarks || '',
+  });
+  const [showSignOut, setShowSignOut] = useState(false);
+
+  const onChangeText = (field: keyof UpdateForm, value: string | Date) => {
+    setUpdateForm(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   const [allDonType, setAllDonType] = useState<DonTypes[]>([]);
   const transformedDonType = allDonType.map(type => ({
@@ -52,10 +73,103 @@ const UpdateDonation = () => {
 
   useEffect(() => {
     getAllDonType();
-    console.log(
-      'Date: ',
-      new Date(donationData.date).toISOString().slice(0, 10),
+  }, []);
+
+  // Handle donation update
+  const handleUpdate = async () => {
+    if (!updateForm.amount || isNaN(Number(updateForm.amount))) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter a valid amount.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!updateForm.paymentMode.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter payment mode.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!value) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please select a donation type.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+    if (!updateForm.date || isNaN(updateForm.date.getTime())) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please select a valid date.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    if (updateForm.date > new Date()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Donation date cannot be in the future.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/Donation/updateDonation/${donationData._id}`,
+        {
+          donorId: donationData._id,
+          amount: Number(updateForm.amount),
+          paymentMode: updateForm.paymentMode,
+          donationType: value,
+          date: updateForm.date.toISOString(),
+          remarks: updateForm.date,
+        },
+      );
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation updated successfully!',
+          visibilityTime: 1500,
+        });
+        navigation.navigate('Donations');
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update donation',
+        visibilityTime: 1500,
+      });
+      console.log(error);
+    }
+  };
+
+  useEffect(() => {
+    // Handle Back Press
+    const handleBack = () => {
+      navigation.navigate('Donations');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
     );
+
+    return () => backHandler.remove();
   }, []);
 
   return (
@@ -68,10 +182,55 @@ const UpdateDonation = () => {
           tintColor={'#fff'}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Users</Text>
-        <TouchableOpacity>
-          <Icon name="account-circle" size={45} color="#fff" />
-        </TouchableOpacity>
+
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity onPress={() => setShowSignOut(prev => !prev)}>
+            <Icon name="account-circle" size={45} color="#fff" />
+          </TouchableOpacity>
+          {showSignOut && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 50,
+                right: 0,
+                backgroundColor: '#fff',
+                borderRadius: 10,
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: {width: 0, height: 2},
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                paddingVertical: 8,
+                minWidth: 140,
+                alignItems: 'flex-start',
+                zIndex: 9999,
+              }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  width: '100%',
+                }}
+                onPress={() => {
+                  setShowSignOut(false);
+                  navigation.replace('Login');
+                }}>
+                <Icon
+                  name="logout"
+                  size={22}
+                  color="#6E11B0"
+                  style={{marginRight: 10}}
+                />
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '600', fontSize: 15}}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView>
@@ -81,90 +240,78 @@ const UpdateDonation = () => {
             padding: 20,
           }}>
           <View style={styles.receiveDonContainer}>
-            <Text style={styles.sectionTitle}>Receive Donations</Text>
+            <Text style={styles.sectionTitle}>Update Donation</Text>
 
-            {/* Input Fields */}
+            {/* Input Fields - Non-editable donor info */}
             <View style={styles.inputContainer}>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="Donor Name"
                 placeholderTextColor={'#666'}
                 value={donationData.donor.name}
-                onChangeText={t => {
-                  /* handle donor name change */
-                }}
+                editable={false}
               />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="Contact"
                 placeholderTextColor={'#666'}
                 value={donationData.donor.contact}
-                onChangeText={t => {
-                  /* handle contact change */
-                }}
+                editable={false}
               />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="Address"
                 placeholderTextColor={'#666'}
                 value={donationData.donor.address}
-                onChangeText={t => {
-                  /* handle address change */
-                }}
+                editable={false}
               />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="Union Council"
                 placeholderTextColor={'#666'}
-                value={donationData?.ucId?.uname}
-                onChangeText={t => {
-                  /* handle union council change */
-                }}
+                value={donationData?.donor?.ucId?.uname || ''}
+                editable={false}
               />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="District"
                 placeholderTextColor={'#666'}
-                value={donationData?.districtId?.district}
-                onChangeText={t => {
-                  /* handle district change */
-                }}
+                value={donationData?.donor?.districtId?.district || ''}
+                editable={false}
               />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, styles.disabledInput]}
                 placeholder="Zone"
                 placeholderTextColor={'#666'}
-                value={donationData?.zoneId?.zname}
-                onChangeText={t => {
-                  /* handle zone change */
-                }}
+                value={donationData?.donor?.zoneId?.zname || ''}
+                editable={false}
               />
+
+              {/* Editable Amount */}
               <TextInput
                 style={styles.textInput}
-                placeholder="Account"
-                value={donationData.amount?.toString() || ''}
-                onChangeText={t => {
-                  /* handle amount change */
-                }}
+                placeholder="Amount"
+                value={updateForm.amount}
+                onChangeText={t => onChangeText('amount', t)}
                 placeholderTextColor={'#666'}
                 keyboardType="numeric"
               />
+
+              {/* Editable Payment Mode */}
               <TextInput
                 style={styles.textInput}
                 placeholder="Payment Mode"
                 placeholderTextColor={'#666'}
-                value={donationData.paymentMode}
-                onChangeText={t => {
-                  /* handle payment mode change */
-                }}
+                value={updateForm.paymentMode}
+                onChangeText={t => onChangeText('paymentMode', t)}
               />
             </View>
 
-            {/* DropDown */}
+            {/* DropDown - Editable Donation Type */}
             <View style={styles.dropDownContainer}>
               <DropDownPicker
                 open={open}
-                value={donationData?.donationType._id}
+                value={value}
                 items={transformedDonType}
                 setOpen={setOpen}
                 setValue={setValue}
@@ -200,20 +347,23 @@ const UpdateDonation = () => {
                   color: '#222',
                   overflow: 'hidden',
                 }}
+                listMode="SCROLLVIEW"
               />
             </View>
 
-            {/* Input Fields */}
+            {/* Input Fields - Editable Remarks */}
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.textInput}
                 placeholder="Remarks"
                 placeholderTextColor={'#666'}
-                value={donationData.remarks}
+                value={updateForm.remarks}
+                onChangeText={t => onChangeText('remarks', t)}
+                multiline
               />
             </View>
 
-            {/* Date Picker */}
+            {/* Editable Date Picker */}
             <TouchableOpacity
               style={[
                 styles.textInput,
@@ -227,22 +377,18 @@ const UpdateDonation = () => {
               ]}
               onPress={() => setDateOpen(true)}
               activeOpacity={0.8}>
-              <Text style={{color: '#222', fontSize: 16}}>
-                {date
-                  ? date.toLocaleDateString()
-                  : donationData?.date
-                  ? new Date(donationData.date).toLocaleDateString()
-                  : 'Select Date'}
+              <Text style={{color: '#222', fontSize: 14}}>
+                {updateForm.date.toLocaleDateString()}
               </Text>
               <Icon name="calendar" size={22} color="#6E11B0" />
               <DatePicker
                 modal
                 open={dateOpen}
                 mode="date"
-                date={date}
+                date={updateForm.date}
                 onConfirm={date => {
                   setDateOpen(false);
-                  setDate(date);
+                  onChangeText('date', date);
                 }}
                 onCancel={() => {
                   setDateOpen(false);
@@ -251,7 +397,7 @@ const UpdateDonation = () => {
             </TouchableOpacity>
 
             {/* Update Button */}
-            <TouchableOpacity style={styles.updateBtn}>
+            <TouchableOpacity style={styles.updateBtn} onPress={handleUpdate}>
               <Text style={styles.updateBtnText}>Update Donation</Text>
             </TouchableOpacity>
           </View>
@@ -277,13 +423,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: '5%',
   },
-  heading: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#6E11B0',
     marginBottom: 20,
@@ -301,12 +442,16 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: '#222',
     width: '95%',
     height: 45,
     alignSelf: 'center',
     marginBottom: 15,
+  },
+  disabledInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#888',
   },
   inputContainer: {
     width: '100%',

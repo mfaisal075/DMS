@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  BackHandler,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -15,6 +16,8 @@ import BASE_URL from '../components/BASE_URL';
 import Toast from 'react-native-toast-message';
 import {Animated, Easing, Platform} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
+import {launchImageLibrary} from 'react-native-image-picker';
+import Sidebar from '../components/Sidebar';
 
 interface Roles {
   _id: string;
@@ -116,7 +119,7 @@ const initialAddDonorForm: AddDonor = {
   name: '',
 };
 
-const Users = () => {
+const Users = ({navigation}: any) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<string | null>(null);
   const [distValue, setDistValue] = useState<string | null>(null);
@@ -153,13 +156,9 @@ const Users = () => {
   const [donorAddModal, setDonorAddModal] = useState('');
   const [updateDonorForm, setDonorUpdateForm] =
     useState<AddDonor>(initialAddDonorForm);
-
-  // State for search and filter in System Users tab
   const [searchName, setSearchName] = useState('');
   const [roleFilterOpen, setRoleFilterOpen] = useState(false);
   const [roleFilterValue, setRoleFilterValue] = useState<string | null>(null);
-
-  //State for search and filter in Donor tab
   const [searchDonor, setSearchDonor] = useState('');
   const [distFilterOpen, setDistFilterOpen] = useState(false);
   const [distFilterValue, setDistFilterValue] = useState<string | null>(null);
@@ -167,6 +166,8 @@ const Users = () => {
   const [ucFilterValue, setUcFilterValue] = useState<string | null>(null);
   const [zoneFilterOpen, setZoneFilterOpen] = useState(false);
   const [zoneFilterValue, setZoneFilterValue] = useState<string | null>(null);
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
   const userOnChange = async (field: keyof AddUser, value: string) => {
     setAddUserForm(prev => ({
@@ -223,6 +224,25 @@ const Users = () => {
     label: zone.zname,
     value: zone._id,
   }));
+
+  //Pick Image
+  const pickImage = async () => {
+    const options = {
+      mediaType: 'photo' as const,
+      quality: 1 as const,
+    };
+
+    const result = await launchImageLibrary(options);
+
+    if (result.assets && result.assets.length > 0) {
+      const image = result.assets[0];
+      console.log('Image URI:', image.uri);
+      return image; // Return the image object
+    } else {
+      console.log('Image not selected');
+      return null;
+    }
+  };
 
   // Get Roles
   const getAllRoles = async () => {
@@ -891,7 +911,7 @@ const Users = () => {
   // Tab buttons
   const tabs = [
     {id: 'Roles', icon: 'account-key', color: '#FF6B6B'},
-    {id: 'System Users', icon: 'account-cog', color: '#4ECDC4'},
+    {id: 'Users', icon: 'account-cog', color: '#4ECDC4'},
     {id: 'Donors', icon: 'account-heart', color: '#FFD166'},
   ];
 
@@ -902,6 +922,19 @@ const Users = () => {
     getAllDist();
     getAllUC();
     getAllZone();
+
+    // Handle Back Press
+    const handleBack = () => {
+      navigation.navigate('Dashboard');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+
+    return () => backHandler.remove();
   }, []);
 
   const LoadingSpinner = () => {
@@ -964,16 +997,65 @@ const Users = () => {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
+        <TouchableOpacity onPress={() => setIsSidebarVisible(true)}>
+          <Icon name="menu" size={30} color="#fff" />
+        </TouchableOpacity>
         <Image
           source={require('../assets/logo-black.png')}
           style={{width: 100, height: 100}}
           tintColor={'#fff'}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Users</Text>
-        <TouchableOpacity>
-          <Icon name="account-circle" size={45} color="#fff" />
-        </TouchableOpacity>
+
+        {/* User Icon with Sign Out Dropdown */}
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity onPress={() => setShowSignOut(prev => !prev)}>
+            <Icon name="account-circle" size={45} color="#fff" />
+          </TouchableOpacity>
+          {showSignOut && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 50,
+                right: 0,
+                backgroundColor: '#fff',
+                borderRadius: 10,
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: {width: 0, height: 2},
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                paddingVertical: 8,
+                minWidth: 140,
+                alignItems: 'flex-start',
+                zIndex: 9999,
+              }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  width: '100%',
+                }}
+                onPress={() => {
+                  setShowSignOut(false);
+                  navigation.replace('Login');
+                }}>
+                <Icon
+                  name="logout"
+                  size={22}
+                  color="#6E11B0"
+                  style={{marginRight: 10}}
+                />
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '600', fontSize: 15}}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Tab Navigation */}
@@ -1057,8 +1139,8 @@ const Users = () => {
         </>
       )}
 
-      {/* System Users List */}
-      {selectedTab === 'System Users' && (
+      {/* Users List */}
+      {selectedTab === 'Users' && (
         <>
           <View style={styles.addBtnContainer}>
             <Text style={styles.sectionTitle}>All Users</Text>
@@ -1098,7 +1180,7 @@ const Users = () => {
                 placeholder="Filter by Role"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1239,7 +1321,7 @@ const Users = () => {
                 placeholder="Filter by District"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1265,7 +1347,7 @@ const Users = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -1293,7 +1375,7 @@ const Users = () => {
                 placeholder="Filter by Zone"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1319,7 +1401,7 @@ const Users = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -1338,7 +1420,7 @@ const Users = () => {
                 placeholder="Filter by UC"
                 placeholderStyle={{
                   color: '#888',
-                  fontSize: 16,
+                  fontSize: 14,
                 }}
                 ArrowUpIconComponent={() => (
                   <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1364,7 +1446,7 @@ const Users = () => {
                   height: 45,
                 }}
                 listItemLabelStyle={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#222',
                   overflow: 'hidden',
                 }}
@@ -1468,13 +1550,13 @@ const Users = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
               }}>
               {selectedTab === 'Roles' && 'Add New Role'}
-              {selectedTab === 'System Users' && 'Add New User'}
+              {selectedTab === 'Users' && 'Add New User'}
               {selectedTab === 'Donors' && 'Add New Donor'}
             </Text>
             <View style={{marginBottom: 40}}>
@@ -1494,7 +1576,7 @@ const Users = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -1510,9 +1592,9 @@ const Users = () => {
               onPress={() => {
                 selectedTab === 'Roles' && addRole();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add {selectedTab === 'Roles' && 'Role'}
-                {selectedTab === 'System Users' && 'User'}
+                {selectedTab === 'Users' && 'User'}
                 {selectedTab === 'Donors' && 'Doner'}
               </Text>
             </TouchableOpacity>
@@ -1520,7 +1602,7 @@ const Users = () => {
         </View>
       </Modal>
 
-      {/* Add System Users */}
+      {/* Add Users */}
       <Modal
         transparent
         visible={addModalVisible === 'User'}
@@ -1557,12 +1639,12 @@ const Users = () => {
             </TouchableOpacity>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
               }}>
-              {selectedTab === 'System Users' && 'Add New User'}
+              {selectedTab === 'Users' && 'Add New User'}
               {selectedTab === 'Donors' && 'Add New Donor'}
             </Text>
             <View style={{marginBottom: 40}}>
@@ -1594,30 +1676,6 @@ const Users = () => {
                 placeholderTextColor={'#888'}
                 style={styles.textInput}
               />
-              <TouchableOpacity
-                style={[
-                  styles.textInput,
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 15,
-                    backgroundColor: '#F8F9FC',
-                  },
-                ]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  // TODO: Implement file picker logic here
-                }}>
-                <Text
-                  style={{
-                    color: addUserForm.img ? '#222' : '#888',
-                    fontSize: 16,
-                  }}>
-                  {addUserForm.img ? 'File Selected' : 'Choose File'}
-                </Text>
-                <Icon name="file-upload" size={22} color="#6E11B0" />
-              </TouchableOpacity>
               <TextInput
                 placeholder={'Enter Password'}
                 value={addUserForm.password}
@@ -1642,7 +1700,7 @@ const Users = () => {
                   placeholder="Select Role"
                   placeholderStyle={{
                     color: '#888',
-                    fontSize: 16,
+                    fontSize: 14,
                   }}
                   ArrowUpIconComponent={() => (
                     <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1668,7 +1726,7 @@ const Users = () => {
                     height: 45,
                   }}
                   listItemLabelStyle={{
-                    fontSize: 16,
+                    fontSize: 14,
                     color: '#222',
                     overflow: 'hidden',
                   }}
@@ -1683,14 +1741,14 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   addUser();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Add User
                 </Text>
               </TouchableOpacity>
@@ -1699,7 +1757,7 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -1707,7 +1765,7 @@ const Users = () => {
                 }}
                 onPress={() => setAddModalVisible('')}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -1763,12 +1821,12 @@ const Users = () => {
             </TouchableOpacity>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
               }}>
-              {selectedTab === 'System Users' && 'Add New User'}
+              {selectedTab === 'Users' && 'Add New User'}
               {selectedTab === 'Donors' && 'Add New Donor'}
             </Text>
             <View style={{marginBottom: 40}}>
@@ -1819,7 +1877,7 @@ const Users = () => {
                     placeholder="Select District"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1845,7 +1903,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -1883,7 +1941,7 @@ const Users = () => {
                     placeholder="Select UC"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1913,7 +1971,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -1947,7 +2005,7 @@ const Users = () => {
                     placeholder="Select Zone"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1977,7 +2035,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -2008,14 +2066,14 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   addDonor();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Add Donor
                 </Text>
               </TouchableOpacity>
@@ -2024,7 +2082,7 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -2038,7 +2096,7 @@ const Users = () => {
                   setZoneValue(null);
                 }}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -2090,12 +2148,12 @@ const Users = () => {
             </TouchableOpacity>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
               }}>
-              {selectedTab === 'System Users' && 'Edit System User'}
+              {selectedTab === 'Users' && 'Edit System User'}
               {selectedTab === 'Donors' && 'Add New Donor'}
             </Text>
             <View style={{marginBottom: 40}}>
@@ -2127,41 +2185,6 @@ const Users = () => {
                 placeholderTextColor={'#888'}
                 style={styles.textInput}
               />
-              <TouchableOpacity
-                style={[
-                  styles.textInput,
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 15,
-                    backgroundColor: '#F8F9FC',
-                  },
-                ]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  // TODO: Implement file picker logic here
-                }}>
-                <Text
-                  style={{
-                    color: updateForm.img ? '#222' : '#888',
-                    fontSize: 16,
-                    width: '80%',
-                  }}
-                  numberOfLines={1}>
-                  {updateForm.img ? updateForm.img : 'Choose File'}
-                </Text>
-                <Icon name="file-upload" size={22} color="#6E11B0" />
-              </TouchableOpacity>
-              {updateForm.img ? (
-                <View style={{alignItems: 'flex-start', marginBottom: 15}}>
-                  <Image
-                    source={{uri: updateForm.img}}
-                    style={{width: 80, height: 80, borderRadius: 8}}
-                    resizeMode="cover"
-                  />
-                </View>
-              ) : null}
 
               <View style={[styles.dropDownContainer, {width: '100%'}]}>
                 <DropDownPicker
@@ -2199,7 +2222,7 @@ const Users = () => {
                     height: 45,
                   }}
                   listItemLabelStyle={{
-                    fontSize: 16,
+                    fontSize: 14,
                     color: '#222',
                     overflow: 'hidden',
                   }}
@@ -2214,14 +2237,14 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   updateUser();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Update User
                 </Text>
               </TouchableOpacity>
@@ -2230,7 +2253,7 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -2289,7 +2312,7 @@ const Users = () => {
             </TouchableOpacity>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -2343,7 +2366,7 @@ const Users = () => {
                     placeholder="Select District"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -2369,7 +2392,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -2393,7 +2416,7 @@ const Users = () => {
                     placeholder="Select UC"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -2423,7 +2446,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -2473,7 +2496,7 @@ const Users = () => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -2490,14 +2513,14 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   updateDonor();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Update
                 </Text>
               </TouchableOpacity>
@@ -2506,7 +2529,7 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -2520,7 +2543,7 @@ const Users = () => {
                   setZoneValue(null);
                 }}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -2564,7 +2587,7 @@ const Users = () => {
             {/* Title */}
             <Text
               style={{
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: 'bold',
                 color: '#6E11B0',
                 marginBottom: 8,
@@ -2575,13 +2598,13 @@ const Users = () => {
             {/* Subtitle */}
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 13,
                 color: '#555',
                 marginBottom: 28,
                 textAlign: 'center',
               }}>
               This {selectedTab === 'Roles' && 'Role'}
-              {selectedTab === 'System Users' && 'User'}
+              {selectedTab === 'Users' && 'User'}
               {selectedTab === 'Donors' && 'Donor'} be permanently deleted.
             </Text>
             {/* Buttons */}
@@ -2596,16 +2619,16 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   selectedTab === 'Roles' && deleteRole();
-                  selectedTab === 'System Users' && deleteUser();
+                  selectedTab === 'Users' && deleteUser();
                   selectedTab === 'Donors' && deleteDonor();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Yes, delete it
                 </Text>
               </TouchableOpacity>
@@ -2614,7 +2637,7 @@ const Users = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -2622,7 +2645,7 @@ const Users = () => {
                 }}
                 onPress={() => setDeleteModalVisible(false)}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -2667,13 +2690,13 @@ const Users = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
               }}>
               {selectedTab === 'Roles' && 'Edit Role'}
-              {selectedTab === 'System Users' && 'Edit User'}
+              {selectedTab === 'Users' && 'Edit User'}
               {selectedTab === 'Donors' && 'Edit Donor'}
             </Text>
             <View style={{marginBottom: 40}}>
@@ -2681,7 +2704,7 @@ const Users = () => {
                 placeholder={
                   selectedTab === 'Roles'
                     ? 'Enter Role Name'
-                    : selectedTab === 'System Users'
+                    : selectedTab === 'Users'
                     ? 'Enter User Name'
                     : selectedTab === 'Donors'
                     ? 'Enter Donor Name'
@@ -2736,7 +2759,7 @@ const Users = () => {
             justifyContent: 'center',
             alignItems: 'center',
           }}>
-          {selectedTab === 'System Users' && (
+          {selectedTab === 'Users' && (
             <View
               style={{
                 width: '85%',
@@ -2778,7 +2801,7 @@ const Users = () => {
                 <Text
                   style={{
                     fontWeight: 'bold',
-                    fontSize: 20,
+                    fontSize: 16,
                     color: '#6E11B0',
                     textAlign: 'center',
                   }}>
@@ -2813,7 +2836,7 @@ const Users = () => {
                 <Text
                   style={{
                     fontWeight: 'bold',
-                    fontSize: 18,
+                    fontSize: 16,
                     color: '#6E11B0',
                     marginBottom: 10,
                     textAlign: 'center',
@@ -2821,23 +2844,23 @@ const Users = () => {
                   Name:{' '}
                   <Text style={{color: '#333'}}>{selectedUser[0]?.name}</Text>
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>
                     Contact:
                   </Text>{' '}
                   {selectedUser[0]?.contact}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>
                     Email:
                   </Text>{' '}
                   {selectedUser[0]?.email}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>CNIC:</Text>{' '}
                   {selectedUser[0]?.cnic}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>Role:</Text>{' '}
                   {selectedUser[0]?.roleId?.role
                     ? selectedUser[0]?.roleId?.role
@@ -2888,7 +2911,7 @@ const Users = () => {
                 <Text
                   style={{
                     fontWeight: 'bold',
-                    fontSize: 20,
+                    fontSize: 16,
                     color: '#6E11B0',
                     textAlign: 'center',
                   }}>
@@ -2921,7 +2944,7 @@ const Users = () => {
                 <Text
                   style={{
                     fontWeight: 'bold',
-                    fontSize: 18,
+                    fontSize: 16,
                     color: '#6E11B0',
                     marginBottom: 10,
                     textAlign: 'center',
@@ -2929,19 +2952,19 @@ const Users = () => {
                   Name:{' '}
                   <Text style={{color: '#333'}}>{selectedDonor[0]?.name}</Text>
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>
                     Contact:
                   </Text>{' '}
                   {selectedDonor[0]?.contact}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>
                     Address:
                   </Text>{' '}
                   {selectedDonor[0]?.address}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>
                     District:
                   </Text>{' '}
@@ -2949,13 +2972,13 @@ const Users = () => {
                     ? selectedDonor[0]?.districtId?.district
                     : 'N/A'}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>Zone:</Text>{' '}
                   {selectedDonor[0]?.zoneId?.zname
                     ? selectedDonor[0]?.zoneId?.zname
                     : 'N/A'}
                 </Text>
-                <Text style={{fontSize: 15, color: '#555', marginBottom: 6}}>
+                <Text style={{fontSize: 13, color: '#555', marginBottom: 6}}>
                   <Text style={{fontWeight: 'bold', color: '#666'}}>UC:</Text>{' '}
                   {selectedDonor[0]?.ucId?.uname
                     ? selectedDonor[0]?.ucId?.uname
@@ -3004,7 +3027,7 @@ const Users = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -3022,7 +3045,7 @@ const Users = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -3038,7 +3061,7 @@ const Users = () => {
               onPress={() => {
                 addDist();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add District
               </Text>
             </TouchableOpacity>
@@ -3081,7 +3104,7 @@ const Users = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -3099,7 +3122,7 @@ const Users = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -3115,7 +3138,7 @@ const Users = () => {
               onPress={() => {
                 addUC();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add Union Council
               </Text>
             </TouchableOpacity>
@@ -3158,7 +3181,7 @@ const Users = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -3176,7 +3199,7 @@ const Users = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -3192,13 +3215,19 @@ const Users = () => {
               onPress={() => {
                 addZone();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add Zone
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Sidebar Component */}
+      <Sidebar
+        isVisible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </View>
   );
 };
@@ -3220,7 +3249,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: '5%',
   },
   heading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -3264,7 +3293,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#6E11B0',
   },
@@ -3288,7 +3317,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#333',
   },
@@ -3337,7 +3366,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   btnText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#fff',
     marginLeft: 5,
@@ -3388,7 +3417,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     backgroundColor: '#F8F9FC',
     marginBottom: 15,
   },

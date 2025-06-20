@@ -1,4 +1,5 @@
 import {
+  BackHandler,
   Easing,
   Image,
   Modal,
@@ -18,6 +19,11 @@ import axios from 'axios';
 import BASE_URL from '../components/BASE_URL';
 import Toast from 'react-native-toast-message';
 import {Animated} from 'react-native';
+// Add to existing imports
+import Print from 'react-native-print';
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
+import {toWords} from 'number-to-words';
+import Sidebar from '../components/Sidebar';
 
 interface Donation {
   _id: string;
@@ -26,20 +32,20 @@ interface Donation {
     name: string;
     contact: string;
     address: string;
+    districtId: {
+      _id: string;
+      district: string;
+    };
+    zoneId: {
+      _id: string;
+      zname: string;
+    };
+    ucId: {
+      _id: string;
+      uname: string;
+    };
   };
   receiptNumber: string;
-  districtId: {
-    _id: string;
-    district: string;
-  };
-  zoneId: {
-    _id: string;
-    zname: string;
-  };
-  ucId: {
-    _id: string;
-    uname: string;
-  };
   amount: string;
   date: string;
   remarks: string;
@@ -151,6 +157,20 @@ const Donations = ({navigation}: any) => {
   const [uc, setUc] = useState('');
   const [zone, setZone] = useState('');
   const [donorAddModal, setDonorAddModal] = useState('');
+  const [donType, setDonType] = useState('');
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [sortedFilteredDonations, setSortedFilteredDonations] = useState<
+    Donation[]
+  >([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+
+  const totalPages = Math.ceil(sortedFilteredDonations.length / itemsPerPage);
+  const paginatedDonations = sortedFilteredDonations.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   // District Dropdown
   const [districts, setDistricts] = useState<Districts[]>([]);
@@ -248,6 +268,27 @@ const Donations = ({navigation}: any) => {
       setLoading(false);
     }
   };
+
+  const filteredDonations = donations.filter(don => {
+    const matchesName = don?.donor?.name
+      .toLowerCase()
+      .includes(searchDonor.toLowerCase());
+
+    const matchesType =
+      !donTypeFilterValue || don?.donationType?._id === donTypeFilterValue;
+
+    const matchesDist =
+      !distFilterValue || don?.donor?.districtId?._id === distFilterValue;
+
+    const matchesZone =
+      !zoneFilterValue || don?.donor?.zoneId?._id === zoneFilterValue;
+
+    const matchesUC = !ucFilterValue || don?.donor?.ucId?._id === ucFilterValue;
+
+    return (
+      matchesName && matchesType && matchesDist && matchesZone && matchesUC
+    );
+  });
 
   // Delete Donation
   const deleteDonation = async () => {
@@ -502,7 +543,7 @@ const Donations = ({navigation}: any) => {
   };
 
   // Rceive Donation
-  const receiveDonation = async () => {
+  const handleSubmit = async () => {
     if (!selectedDonor[0]?._id) {
       Toast.show({
         type: 'error',
@@ -553,18 +594,33 @@ const Donations = ({navigation}: any) => {
       return;
     }
 
+    if (donForm.date && donForm.date > new Date()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Donation date cannot be in the future.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
     try {
-      const res = await axios.post(`${BASE_URL}/Donation/receiveDonation`, {
-        address: selectedDonor[0]?.address,
-        amount: donForm.amount,
-        contact: selectedDonor[0]?.contact,
-        date: donForm.date,
-        donationType: value,
+      const payload = {
         donorId: selectedDonor[0]?._id,
         name: selectedDonor[0]?.name,
-        paymentMode: donForm.paymentMode,
-        remarks: donForm.remarks,
-      });
+        contact: selectedDonor[0]?.contact,
+        address: selectedDonor[0]?.address,
+        amount: Number(donForm.amount), // Convert to number explicitly
+        paymentMode: donForm.paymentMode.trim(),
+        donationType: value,
+        date: new Date(donForm.date).toISOString(),
+        remarks: donForm.remarks || undefined,
+      };
+
+      const res = await axios.post(
+        `${BASE_URL}/Donation/receiveDonation`,
+        payload,
+      );
 
       if (res.status === 200) {
         Toast.show({
@@ -576,7 +632,7 @@ const Donations = ({navigation}: any) => {
         getReceivedDonations();
         setSelectedDonor([]);
         setDonForm(initialDonationForm);
-        setSearchDonor('');
+        setSearchDonors('');
       }
     } catch (err) {
       Toast.show({
@@ -589,6 +645,52 @@ const Donations = ({navigation}: any) => {
     }
   };
 
+  // Add Donation Type
+  const addDonType = async () => {
+    if (!donType.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Field',
+        text2: 'Please enter a Donation Type name.',
+        visibilityTime: 1500,
+      });
+      return;
+    }
+
+    try {
+      const exists = allDonType.some(
+        d => d.dontype.trim().toLowerCase() === donType.trim().toLowerCase(),
+      );
+      if (exists) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duplicate Zone',
+          text2: 'A Donation Type with this name already exists.',
+          visibilityTime: 1500,
+        });
+        return;
+      }
+
+      const res = await axios.post(`${BASE_URL}/donType/addDonType`, {
+        dontype: donType.trim(),
+      });
+
+      if (res.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Donation Type added successfully!',
+          visibilityTime: 1500,
+        });
+        setDonType('');
+        setDonorAddModal('');
+        getAllDonType();
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   useEffect(() => {
     getDonors();
     getReceivedDonations();
@@ -596,17 +698,246 @@ const Donations = ({navigation}: any) => {
     getAllDonType();
     getAllUC();
     getAllZone();
+
+    const handleBack = () => {
+      navigation.navigate('Dashboard');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+
+    return () => backHandler.remove();
   }, []);
 
-  const [items, setItems] = useState([
-    {label: 'Donation type 1', value: 1},
-    {label: 'Donation type 22', value: 2},
-    {label: 'Donation type 3', value: 3},
-    {label: 'Education fund', value: 4},
-    {label: 'Donation type 5', value: 5},
-    {label: 'Health Fund', value: 6},
-    {label: 'New type', value: 7},
+  useEffect(() => {
+    const sorted = [...filteredDonations].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+
+    setSortedFilteredDonations(sorted);
+    setCurrentPage(1);
+  }, [
+    donations,
+    searchDonor,
+    donTypeFilterValue,
+    distFilterValue,
+    zoneFilterValue,
+    ucFilterValue,
   ]);
+
+  const printReceipt = async (donationData: Donation) => {
+    try {
+      // Format date
+      const receiptDate = donationData.date
+        ? new Date(donationData.date).toLocaleDateString()
+        : new Date().toLocaleDateString();
+
+      // Use the current date and time as the receipt print date/time
+      const receiptDateTime = new Date().toLocaleString();
+
+      // Generate HTML content
+      const htmlContent = `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 20px; 
+        }
+        .top-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 40px;
+        }
+        .top-date {
+          font-size: 13px;
+          color: #444;
+        }
+        .top-title {
+          flex: 1;
+          text-align: center;
+          font-size: 14px;
+          font-weight: bold;
+          letter-spacing: 1px;
+        }
+        .header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+        .logo {
+          height: 70px;
+        }
+        .receipt-number { 
+          text-align: right; 
+          font-size: 14px;
+          font-weight: 900;
+        }
+        .details-container { 
+          display: flex; 
+          margin-bottom: 15px; 
+        }
+        .column { 
+          flex: 1; 
+          padding: 0 10px; 
+        }
+        .detail-row { 
+          display: flex; 
+          margin-bottom: 8px; 
+          align-items: center; 
+        }
+        .label { 
+          font-weight: bold; 
+          min-width: 120px; 
+        }
+        .value { 
+          border-bottom: 1px solid #666; 
+          flex: 1; 
+          padding-left: 10px; 
+          min-height: 20px; 
+        }
+        .amount-words { 
+          margin: 20px 0; 
+          padding: 10px 0; 
+          border-top: 1px dashed #ccc; 
+          border-bottom: 1px dashed #ccc; 
+        }
+        .footer { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          margin-top: 40px; 
+        }
+        .stamp { 
+          width: 150px; 
+          height: 80px; 
+          border: 1px dashed #666; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          font-size: 12px; 
+        }
+        .thank-you { 
+          text-align: center; 
+          margin-top: 20px; 
+          padding-top: 10px; 
+          border-top: 1px solid #666; 
+          color: #666; 
+        }
+          </style>
+        </head>
+        <body>
+          <div class="top-bar">
+        <div class="top-date">${receiptDateTime}</div>
+        <div class="top-title">Donation Receipt</div>
+        <div style="width: 120px;"></div>
+          </div>
+          <div class="header-row">
+        <img class="logo" src="https://res.cloudinary.com/dnua9unrw/image/upload/v1750158441/logo-black_ccsuc4.png" alt="Logo" />
+        <div class="receipt-number">
+          Receipt NO: ${donationData?.receiptNumber ?? 'N/A'}
+        </div>
+          </div>
+          
+          <div class="details-container">
+        <div class="column">
+          <div class="detail-row">
+        <span class="label">Donor Name:</span>
+        <span class="value">${donationData.donor.name}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Contact:</span>
+        <span class="value">${donationData.donor.contact}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Address:</span>
+        <span class="value">${donationData.donor.address}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Donation Type:</span>
+        <span class="value">${
+          donationData.donationType?.dontype || 'N/A'
+        }</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Amount:</span>
+        <span class="value">Rs. ${donationData.amount}</span>
+          </div>
+        </div>
+        
+        <div class="column">
+          <div class="detail-row">
+        <span class="label">District:</span>
+        <span class="value">${
+          donationData.donor?.districtId?.district || 'N/A'
+        }</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Zone/Tehsil:</span>
+        <span class="value">${donationData.donor?.zoneId?.zname || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Union Council:</span>
+        <span class="value">${donationData.donor?.ucId?.uname || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Remarks:</span>
+        <span class="value">${donationData.remarks || 'None'}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Payment Mode:</span>
+        <span class="value">${donationData.paymentMode || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+        <span class="label">Date:</span>
+        <span class="value">${receiptDate}</span>
+          </div>
+        </div>
+          </div>
+          
+          <div class="amount-words">
+        <strong>Amount in Words:</strong> ${toWords(
+          Number(donationData.amount || 0),
+        ).replace(/\b\w/g, l => l.toUpperCase())} Rupees Only
+          </div>
+          
+          <div class="footer">
+        <div class="received-by">Received By: </div>
+        <div class="stamp">Office Stamp</div>
+          </div>
+          
+          <div class="thank-you">
+        Thank you for your generous contribution.
+          </div>
+        </body>
+      </html>
+        `;
+
+      // Generate PDF
+      const {filePath} = await RNHTMLtoPDF.convert({
+        html: htmlContent,
+        fileName: `Receipt_${donationData._id}`,
+        directory: 'Documents',
+      });
+
+      // Print the PDF
+      if (filePath) {
+        await Print.print({filePath});
+      } else {
+        throw new Error('PDF file path is undefined.');
+      }
+    } catch (error) {
+      console.error('Failed to print receipt:', error);
+    }
+  };
 
   // Tab buttons
   const tabs = [
@@ -715,27 +1046,6 @@ const Donations = ({navigation}: any) => {
     );
   };
 
-  const filteredDonations = donations.filter(don => {
-    const matchesName = don?.donor?.name
-      .toLowerCase()
-      .includes(searchDonor.toLowerCase());
-
-    const matchesType =
-      !donTypeFilterValue || don?.donationType?._id === donTypeFilterValue;
-
-    const matchesDist =
-      !distFilterValue || don?.districtId?._id === distFilterValue;
-
-    const matchesZone =
-      !zoneFilterValue || don?.zoneId?._id === zoneFilterValue;
-
-    const matchesUC = !ucFilterValue || don?.ucId?._id === ucFilterValue;
-
-    return (
-      matchesName && matchesType && matchesDist && matchesZone && matchesUC
-    );
-  });
-
   // State for donor search dropdown visibility
   const [showDonorSearch, setShowDonorSearch] = useState(false);
 
@@ -746,16 +1056,64 @@ const Donations = ({navigation}: any) => {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
+        <TouchableOpacity onPress={() => setIsSidebarVisible(true)}>
+          <Icon name="menu" size={30} color="#fff" />
+        </TouchableOpacity>
         <Image
           source={require('../assets/logo-black.png')}
           style={{width: 100, height: 100}}
           tintColor={'#fff'}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Donations</Text>
-        <TouchableOpacity>
-          <Icon name="account-circle" size={45} color="#fff" />
-        </TouchableOpacity>
+
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity onPress={() => setShowSignOut(prev => !prev)}>
+            <Icon name="account-circle" size={45} color="#fff" />
+          </TouchableOpacity>
+          {showSignOut && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 50,
+                right: 0,
+                backgroundColor: '#fff',
+                borderRadius: 10,
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: {width: 0, height: 2},
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                paddingVertical: 8,
+                minWidth: 140,
+                alignItems: 'flex-start',
+                zIndex: 9999,
+              }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  width: '100%',
+                }}
+                onPress={() => {
+                  setShowSignOut(false);
+                  navigation.replace('Login');
+                }}>
+                <Icon
+                  name="logout"
+                  size={22}
+                  color="#6E11B0"
+                  style={{marginRight: 10}}
+                />
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '600', fontSize: 15}}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Tab Navigation */}
@@ -830,7 +1188,7 @@ const Donations = ({navigation}: any) => {
                       placeholder="Donations By Type"
                       placeholderStyle={{
                         color: '#888',
-                        fontSize: 16,
+                        fontSize: 14,
                       }}
                       ArrowUpIconComponent={() => (
                         <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -856,7 +1214,7 @@ const Donations = ({navigation}: any) => {
                         height: 45,
                       }}
                       listItemLabelStyle={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: '#222',
                         overflow: 'hidden',
                       }}
@@ -872,7 +1230,7 @@ const Donations = ({navigation}: any) => {
                       placeholder="Donations By District"
                       placeholderStyle={{
                         color: '#888',
-                        fontSize: 16,
+                        fontSize: 14,
                       }}
                       ArrowUpIconComponent={() => (
                         <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -898,7 +1256,7 @@ const Donations = ({navigation}: any) => {
                         height: 45,
                       }}
                       listItemLabelStyle={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: '#222',
                         overflow: 'hidden',
                       }}
@@ -916,7 +1274,7 @@ const Donations = ({navigation}: any) => {
                       placeholder="Donations By Zone"
                       placeholderStyle={{
                         color: '#888',
-                        fontSize: 16,
+                        fontSize: 14,
                       }}
                       ArrowUpIconComponent={() => (
                         <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -946,7 +1304,7 @@ const Donations = ({navigation}: any) => {
                         height: 45,
                       }}
                       listItemLabelStyle={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: '#222',
                         overflow: 'hidden',
                       }}
@@ -962,7 +1320,7 @@ const Donations = ({navigation}: any) => {
                       placeholder="Donations By UC"
                       placeholderStyle={{
                         color: '#888',
-                        fontSize: 16,
+                        fontSize: 14,
                       }}
                       ArrowUpIconComponent={() => (
                         <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -992,7 +1350,7 @@ const Donations = ({navigation}: any) => {
                         height: 45,
                       }}
                       listItemLabelStyle={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: '#222',
                         overflow: 'hidden',
                       }}
@@ -1002,8 +1360,9 @@ const Donations = ({navigation}: any) => {
               </>
             )}
           </View>
+
           <Text style={[styles.sectionTitle, {paddingHorizontal: '5%'}]}>
-            All Users
+            All Donations
           </Text>
           <View style={{flex: 1}}>
             <ScrollView
@@ -1011,10 +1370,10 @@ const Donations = ({navigation}: any) => {
               contentContainerStyle={{paddingBottom: 40}}>
               {loading ? (
                 <LoadingSpinner />
-              ) : filteredDonations.length === 0 ? (
+              ) : paginatedDonations.length === 0 ? (
                 <Text style={styles.noDataText}>No Donation found</Text>
               ) : (
-                filteredDonations.map(donor => (
+                paginatedDonations.map(donor => (
                   <View key={donor._id} style={styles.listItem}>
                     <View style={styles.avatar}>
                       <Icon name="charity" size={40} color="#6E11B0" />
@@ -1059,6 +1418,36 @@ const Donations = ({navigation}: any) => {
                 ))
               )}
             </ScrollView>
+
+            {sortedFilteredDonations.length > itemsPerPage && (
+              <View style={styles.paginationContainer}>
+                <TouchableOpacity
+                  onPress={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={[
+                    styles.paginationButton,
+                    currentPage === 1 && styles.disabledButton,
+                  ]}>
+                  <Text style={styles.paginationText}>Previous</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.pageText}>
+                  Page {currentPage} of {totalPages}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setCurrentPage(prev => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  style={[
+                    styles.paginationButton,
+                    currentPage === totalPages && styles.disabledButton,
+                  ]}>
+                  <Text style={styles.paginationText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -1099,7 +1488,11 @@ const Donations = ({navigation}: any) => {
                     setTimeout(() => setShowDonorSearch(false), 200)
                   }
                 />
-                <TouchableOpacity style={styles.searchBtn}>
+                <TouchableOpacity
+                  style={styles.searchBtn}
+                  onPress={() => {
+                    setShowDonorSearch(true);
+                  }}>
                   <Text style={styles.searchBtnText}>Search</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setModalVisible('Donor')}>
@@ -1260,14 +1653,13 @@ const Donations = ({navigation}: any) => {
                 <DropDownPicker
                   open={open}
                   value={value}
-                  items={items}
+                  items={transformedDonType}
                   setOpen={setOpen}
                   setValue={setValue}
-                  setItems={setItems}
                   placeholder="Select Type"
                   placeholderStyle={{
                     color: '#888',
-                    fontSize: 16,
+                    fontSize: 14,
                   }}
                   ArrowUpIconComponent={() => (
                     <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1292,14 +1684,14 @@ const Donations = ({navigation}: any) => {
                     height: 45,
                   }}
                   listItemLabelStyle={{
-                    fontSize: 14,
+                    fontSize: 13,
                     color: '#222',
                     overflow: 'hidden',
                   }}
                 />
               </View>
 
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => setDonorAddModal('DonType')}>
                 <Icon name="plus" size={35} color={'#6E11B0'} />
               </TouchableOpacity>
 
@@ -1337,7 +1729,7 @@ const Donations = ({navigation}: any) => {
               ]}
               onPress={() => setDateOpen(true)}
               activeOpacity={0.8}>
-              <Text style={{color: '#222', fontSize: 16}}>
+              <Text style={{color: '#222', fontSize: 14}}>
                 {donForm.date
                   ? donForm.date.toLocaleDateString()
                   : 'Select Date'}
@@ -1382,12 +1774,12 @@ const Donations = ({navigation}: any) => {
                 borderRadius: 10,
                 paddingVertical: 12,
                 alignItems: 'center',
-                marginTop: 15,
+                marginTop: 12,
               }}
               onPress={() => {
-                receiveDonation();
+                handleSubmit();
               }}>
-              <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 14}}>
                 Submit Donation
               </Text>
             </TouchableOpacity>
@@ -1488,24 +1880,35 @@ const Donations = ({navigation}: any) => {
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>District: </Text>
               <Text style={styles.modalSimpText}>
-                {selectedDon[0]?.districtId?.district ?? 'N/A'}
+                {selectedDon[0]?.donor?.districtId?.district ?? 'N/A'}
               </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Zone/ Tehsil: </Text>
               <Text style={styles.modalSimpText}>
-                {selectedDon[0]?.zoneId?.zname ?? 'N/A'}
+                {selectedDon[0]?.donor?.zoneId?.zname ?? 'N/A'}
               </Text>
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalBoldText}>Union Council: </Text>
               <Text style={styles.modalSimpText}>
-                {selectedDon[0]?.ucId?.uname ?? 'N/A'}
+                {selectedDon[0]?.donor?.ucId?.uname ?? 'N/A'}
               </Text>
             </View>
-            <View style={styles.modalRow}>
+            <View style={[styles.modalRow, {alignItems: 'flex-start'}]}>
               <Text style={styles.modalBoldText}>Remarks: </Text>
-              <Text style={styles.modalSimpText}>
+              <Text
+                style={[
+                  styles.modalSimpText,
+                  {
+                    flex: 1,
+                    flexWrap: 'wrap',
+                    marginLeft: 8,
+                    textAlign: 'right',
+                  },
+                ]}
+                numberOfLines={0}
+                ellipsizeMode="tail">
                 {selectedDon[0]?.remarks ?? 'N/A'}
               </Text>
             </View>
@@ -1558,13 +1961,20 @@ const Donations = ({navigation}: any) => {
             <Text
               style={[
                 styles.modalSimpText,
-                {fontSize: 12, fontWeight: '900', color: '#888'},
+                {
+                  fontSize: 12,
+                  fontWeight: '900',
+                  color: '#888',
+                  textAlign: 'center',
+                },
               ]}>
               Thank you for your generous contribution.
             </Text>
             <View style={styles.separator} />
 
-            <TouchableOpacity style={styles.modalPrintBtn}>
+            <TouchableOpacity
+              style={styles.modalPrintBtn}
+              onPress={() => printReceipt(selectedDon[0])}>
               <Icon name="printer" size={18} color={'#fff'} />
               <Text style={styles.modalPrintBtnText}>Print</Text>
             </TouchableOpacity>
@@ -1610,7 +2020,7 @@ const Donations = ({navigation}: any) => {
             {/* Title */}
             <Text
               style={{
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: 'bold',
                 color: '#6E11B0',
                 marginBottom: 8,
@@ -1621,7 +2031,7 @@ const Donations = ({navigation}: any) => {
             {/* Subtitle */}
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 13,
                 color: '#555',
                 marginBottom: 28,
                 textAlign: 'center',
@@ -1640,14 +2050,14 @@ const Donations = ({navigation}: any) => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   deleteDonation();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Yes, delete it
                 </Text>
               </TouchableOpacity>
@@ -1656,7 +2066,7 @@ const Donations = ({navigation}: any) => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -1667,7 +2077,7 @@ const Donations = ({navigation}: any) => {
                   setSelectedDon([]);
                 }}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -1723,7 +2133,7 @@ const Donations = ({navigation}: any) => {
             </TouchableOpacity>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -1792,7 +2202,7 @@ const Donations = ({navigation}: any) => {
                     placeholder="Select District"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1818,7 +2228,7 @@ const Donations = ({navigation}: any) => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -1856,7 +2266,7 @@ const Donations = ({navigation}: any) => {
                     placeholder="Select UC"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1886,7 +2296,7 @@ const Donations = ({navigation}: any) => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -1920,7 +2330,7 @@ const Donations = ({navigation}: any) => {
                     placeholder="Select Zone"
                     placeholderStyle={{
                       color: '#888',
-                      fontSize: 16,
+                      fontSize: 14,
                     }}
                     ArrowUpIconComponent={() => (
                       <Icon name="chevron-up" size={25} color="#6E11B0" />
@@ -1950,7 +2360,7 @@ const Donations = ({navigation}: any) => {
                       height: 45,
                     }}
                     listItemLabelStyle={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: '#222',
                       overflow: 'hidden',
                     }}
@@ -1981,14 +2391,14 @@ const Donations = ({navigation}: any) => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
                 onPress={() => {
                   addDonor();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Add Donor
                 </Text>
               </TouchableOpacity>
@@ -1997,7 +2407,7 @@ const Donations = ({navigation}: any) => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -2011,7 +2421,7 @@ const Donations = ({navigation}: any) => {
                   setZoneValue(null);
                 }}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -2020,7 +2430,7 @@ const Donations = ({navigation}: any) => {
         </View>
       </Modal>
 
-      {/* Add District, Zone and UC Modal */}
+      {/* Add District, Zone, Donation Type and UC Modal */}
       <Modal
         transparent
         visible={donorAddModal === 'District'}
@@ -2057,7 +2467,7 @@ const Donations = ({navigation}: any) => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -2075,7 +2485,7 @@ const Donations = ({navigation}: any) => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -2091,7 +2501,7 @@ const Donations = ({navigation}: any) => {
               onPress={() => {
                 addDist();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add District
               </Text>
             </TouchableOpacity>
@@ -2134,7 +2544,7 @@ const Donations = ({navigation}: any) => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -2152,7 +2562,7 @@ const Donations = ({navigation}: any) => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -2168,7 +2578,7 @@ const Donations = ({navigation}: any) => {
               onPress={() => {
                 addUC();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add Union Council
               </Text>
             </TouchableOpacity>
@@ -2211,7 +2621,7 @@ const Donations = ({navigation}: any) => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -2229,7 +2639,7 @@ const Donations = ({navigation}: any) => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -2245,13 +2655,96 @@ const Donations = ({navigation}: any) => {
               onPress={() => {
                 addZone();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add Zone
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+      <Modal
+        transparent
+        visible={donorAddModal === 'DonType'}
+        animationType="fade"
+        onRequestClose={() => setDonorAddModal('')}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Toast />
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 20,
+              elevation: 10,
+            }}>
+            {/* Close Button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                padding: 6,
+              }}
+              onPress={() => setDonorAddModal('')}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            {/* Text Input */}
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '700',
+                marginBottom: 20,
+                color: '#6E11B0',
+              }}>
+              Add Donation Type
+            </Text>
+            <View style={{marginBottom: 40}}>
+              <TextInput
+                placeholder={'Enter District Name'}
+                value={donType}
+                onChangeText={setDonType}
+                placeholderTextColor={'#888'}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 14,
+                  backgroundColor: '#F8F9FC',
+                }}
+              />
+            </View>
+            {/* Add Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#6E11B0',
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                addDonType();
+              }}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
+                Add Donation Type
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sidebar Component */}
+      <Sidebar
+        isVisible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </View>
   );
 };
@@ -2273,7 +2766,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: '5%',
   },
   heading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -2388,7 +2881,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.6,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: '#222',
     width: '58%',
     height: 45,
@@ -2449,10 +2942,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   modalBoldText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
   },
   modalSimpText: {
+    fontSize: 12,
     fontWeight: '400',
   },
   separator: {
@@ -2554,5 +3048,33 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontSize: 16,
     marginTop: 20,
+  },
+
+  // Pagination
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  paginationButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: '#6E11B0',
+    borderRadius: 5,
+    marginHorizontal: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  paginationText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  pageText: {
+    fontSize: 16,
+    color: '#555',
   },
 });

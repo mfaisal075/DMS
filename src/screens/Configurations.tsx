@@ -1,5 +1,6 @@
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   Modal,
@@ -16,6 +17,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import BASE_URL from '../components/BASE_URL';
 import Toast from 'react-native-toast-message';
+import Sidebar from '../components/Sidebar';
 
 interface Districts {
   _id: string;
@@ -37,7 +39,7 @@ interface DonTypes {
   dontype: string;
 }
 
-const Configurations = () => {
+const Configurations = ({navigation}: any) => {
   const [selectedTab, setSelectedTab] = useState('District');
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -56,12 +58,12 @@ const Configurations = () => {
   const [updateDonType, setUpdateDonType] = useState('');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Array<{_id: string}>>([]);
-
-  // States for search
+  const [showSignOut, setShowSignOut] = useState(false);
   const [searchDistrict, setSearchDistrict] = useState('');
   const [searchZone, setSearchZone] = useState('');
   const [searchUC, setSearchUC] = useState('');
   const [searchDonType, setSearchDonType] = useState('');
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
   // Get Districts
   const getAllDist = async () => {
@@ -357,7 +359,7 @@ const Configurations = () => {
     }
   };
 
-  // Delete UC
+  // Delete Donation Type
   const deleteDonType = async () => {
     try {
       setLoading(true);
@@ -644,6 +646,19 @@ const Configurations = () => {
     getAllUC();
     getAllZone();
     getAllDonType();
+
+    // Handle Back Press
+    const handleBack = () => {
+      navigation.navigate('Dashboard');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+
+    return () => backHandler.remove();
   }, []);
 
   const LoadingSpinner = () => {
@@ -717,16 +732,63 @@ const Configurations = () => {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
+        <TouchableOpacity onPress={() => setIsSidebarVisible(true)}>
+          <Icon name="menu" size={30} color="#fff" />
+        </TouchableOpacity>
         <Image
           source={require('../assets/logo-black.png')}
           style={{width: 100, height: 100}}
           tintColor={'#fff'}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Configurations</Text>
-        <TouchableOpacity>
-          <Icon name="account-circle" size={45} color="#fff" />
-        </TouchableOpacity>
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity onPress={() => setShowSignOut(prev => !prev)}>
+            <Icon name="account-circle" size={45} color="#fff" />
+          </TouchableOpacity>
+          {showSignOut && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 50,
+                right: 0,
+                backgroundColor: '#fff',
+                borderRadius: 10,
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: {width: 0, height: 2},
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                paddingVertical: 8,
+                minWidth: 140,
+                alignItems: 'flex-start',
+                zIndex: 9999,
+              }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  width: '100%',
+                }}
+                onPress={() => {
+                  setShowSignOut(false);
+                  navigation.replace('Login');
+                }}>
+                <Icon
+                  name="logout"
+                  size={22}
+                  color="#6E11B0"
+                  style={{marginRight: 10}}
+                />
+                <Text
+                  style={{color: '#6E11B0', fontWeight: '600', fontSize: 15}}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Tab Navigation */}
@@ -944,15 +1006,33 @@ const Configurations = () => {
       {/* Donation Type List */}
       {selectedTab === 'Donation Type' && (
         <>
-          <View style={styles.addBtnContainer}>
-            <Text style={[styles.sectionTitle, {fontSize: 14}]}>
-              Configure Donation Type
-            </Text>
+          <View style={[styles.addBtnContainer, {flexWrap: 'wrap'}]}>
+            <View style={{flex: 1, paddingRight: 10}}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  {fontSize: 14, flexShrink: 1, flexWrap: 'wrap'},
+                ]}
+                numberOfLines={2}
+                ellipsizeMode="tail">
+                Configure Donation Type
+              </Text>
+            </View>
             <TouchableOpacity
-              style={styles.addButton}
+              style={[
+                styles.addButton,
+                {
+                  maxWidth: 160,
+                  flexShrink: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                },
+              ]}
               onPress={() => setModalVisible(true)}>
               <Icon name="plus" size={18} color={'#fff'} />
-              <Text style={styles.btnText}>Add Donation Type</Text>
+              <Text style={styles.btnText} numberOfLines={2}>
+                Add Donation Type
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.searchFilterContainer}>
@@ -1039,7 +1119,7 @@ const Configurations = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -1090,7 +1170,7 @@ const Configurations = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -1109,7 +1189,7 @@ const Configurations = () => {
                 selectedTab === 'UC' && addUC();
                 selectedTab === 'Donation Type' && addDonType();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Add {selectedTab === 'District' && 'District'}
                 {selectedTab === 'Zone/Tehsil' && 'Zone'}
                 {selectedTab === 'UC' && 'Union Council'}
@@ -1155,7 +1235,7 @@ const Configurations = () => {
             {/* Title */}
             <Text
               style={{
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: 'bold',
                 color: '#6E11B0',
                 marginBottom: 8,
@@ -1166,7 +1246,7 @@ const Configurations = () => {
             {/* Subtitle */}
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 13,
                 color: '#555',
                 marginBottom: 28,
                 textAlign: 'center',
@@ -1189,7 +1269,7 @@ const Configurations = () => {
                   flex: 1,
                   backgroundColor: '#6E11B0',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginRight: 8,
                 }}
@@ -1199,7 +1279,7 @@ const Configurations = () => {
                   selectedTab === 'UC' && deleteUC();
                   selectedTab === 'Donation Type' && deleteDonType();
                 }}>
-                <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+                <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                   Yes, delete it
                 </Text>
               </TouchableOpacity>
@@ -1208,7 +1288,7 @@ const Configurations = () => {
                   flex: 1,
                   backgroundColor: '#F3F6FB',
                   borderRadius: 8,
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   alignItems: 'center',
                   marginLeft: 8,
                   borderWidth: 1,
@@ -1216,7 +1296,7 @@ const Configurations = () => {
                 }}
                 onPress={() => setDeleteModalVisible(false)}>
                 <Text
-                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 16}}>
+                  style={{color: '#6E11B0', fontWeight: '700', fontSize: 14}}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -1271,7 +1351,7 @@ const Configurations = () => {
             {/* Text Input */}
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 marginBottom: 20,
                 color: '#6E11B0',
@@ -1322,7 +1402,7 @@ const Configurations = () => {
                   borderColor: '#E0E0E0',
                   borderRadius: 8,
                   padding: 12,
-                  fontSize: 16,
+                  fontSize: 14,
                   backgroundColor: '#F8F9FC',
                 }}
               />
@@ -1341,13 +1421,19 @@ const Configurations = () => {
                 selectedTab === 'UC' && editUC();
                 selectedTab === 'Donation Type' && editDonType();
               }}>
-              <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              <Text style={{color: '#fff', fontWeight: '700', fontSize: 14}}>
                 Save Changes
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Sidebar Component */}
+      <Sidebar
+        isVisible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </View>
   );
 };
@@ -1369,7 +1455,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: '5%',
   },
   heading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -1436,7 +1522,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   btnText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#fff',
     marginLeft: 5,
@@ -1461,7 +1547,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#333',
   },
@@ -1524,7 +1610,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     backgroundColor: '#F8F9FC',
     marginBottom: 15,
   },
